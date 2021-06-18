@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   geometry_msgs
+  sensor_msgs
   roscpp
   roslib
   message_generation
@@ -52,8 +53,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  ArmTrajectory.msg
   CylinderObj.msg
   Edge.msg
+  ObjectRearrangePath.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -62,6 +65,7 @@ add_service_files(
   AstarPathFinding.srv
   CylinderPoseEstimate.srv
   CylinderPositionEstimate.srv
+  ExecuteTrajectory.srv
   GenerateInstanceCylinder.srv
   RearrangeCylinderObject.srv
   ReproduceInstanceCylinder.srv
@@ -77,8 +81,7 @@ add_service_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
-  std_msgs
-  geometry_msgs
+  std_msgs geometry_msgs sensor_msgs
 )
 
 ################################################
@@ -113,7 +116,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES uniform_object_rearrangement
- CATKIN_DEPENDS roscpp rospy message_runtime std_msgs roslib
+ CATKIN_DEPENDS roscpp rospy message_runtime std_msgs sensor_msgs roslib
 #  DEPENDS system_lib
 )
 

@@ -776,8 +776,8 @@ class Planner(object):
 
     def AstarPathFinding(self, initialConfig, targetConfig, object_idx, robot, workspace, armType, motionType):
         ### Input: initialConfig, configToPreGraspPose [q1, q2, ..., q7]
-        ### Output: traj (format: [edge_config1, edge_config2, ...])
-        ###         and each edge_config is a list of [7*1 config]
+        ### Output: traj (format: [joint_state1, joint_state2, ...])
+        ###         and joint_state is a list of joint values
         ### first prepare the start_goal file
 
         result_traj = [] ### the output we want to construct
@@ -824,7 +824,8 @@ class Planner(object):
                 config2 = self.nodes[armType][smoothed_path[i+1]]
             ### get edge trajectory
             config_edge_traj = self.generateTrajectory_DirectConfigPath(config1, config2, robot, armType, object_idx, workspace)
-            result_traj.append(config_edge_traj)
+            # result_traj.append(config_edge_traj)
+            result_traj += config_edge_traj
 
         ### before you claim the victory of this query, increment the planning query
         ### so as to tell people this query is over, next time is a new query

@@ -43,11 +43,9 @@ class PybulletPlanScene(object):
         constrained_area_dim, thickness_flank, back_distance, \
         object_mesh_path = self.readROSParam()
         
-        print("1111111111111")
         ### set the rospkg path
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
-        print("1111111111111")
 	
         ### set the server for the pybullet plan scene
         # self.planningClientID = p.connect(p.DIRECT)
@@ -55,7 +53,7 @@ class PybulletPlanScene(object):
         # p.setAdditionalSearchPath(pybullet_data.getDataPath())
         # self.egl_plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
         # print("plugin=", self.egl_plugin)
-        print("1111111111111")
+
         ### create a planner assistant
         self.planner_p = Planner(
             self.rosPackagePath, self.planningClientID,
@@ -137,59 +135,71 @@ class PybulletPlanScene(object):
         ### given the specified cylinder object and the armType
         rospy.logwarn("PLANNING TO REARRANGE THE OBJECT")
         print("object: {}".format(req.object_idx))
+        transit_traj = []
+        transfer_traj = []
+        finish_traj = []
+
+        ########################## generate picking pose + pre-picking pose ###################################
         currConfig = self.getCurrentConfig(req.armType)
         pickingPose = self.provide_pose_for_object(req.object_idx, "picking")
         isPoseValid, configToPickingPose = self.planner_p.generateConfigBasedOnPose(
                     pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
-
         if not isPoseValid:
             print("this pose is not even valid, let alone generating pre-picking")
             return RearrangeCylinderObjectResponse(isPoseValid)
         else:
             print("the picking pose is valid, generate pre-picking")
-            isPoseValid, prePickingPose, configToPrePickingPose = self.planner_p.generatePrePickingOrPostPlacingPose(
-                        pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
+            isPoseValid, prePickingPose, configToPrePickingPose = \
+                self.planner_p.generatePrePickingOrPostPlacingPose(
+                    pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
             if not isPoseValid:
                 print("the pre-picking pose is not valid, thus the picking pose is deemed as invalid as well")
                 return RearrangeCylinderObjectResponse(isPoseValid)
         print("both picking pose and pre-picking pose are legitimate. Proceed to planning.")
+        #######################################################################################################
 
-        result_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePickingPose, req.object_idx, 
+        ########################## plan the path to pre-picking configuration #################################
+        prePicking_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePickingPose, req.object_idx, 
                                             self.robot_p, self.workspace_p, req.armType, "transit")
         ### the planning has been finished, either success or failure
-        if result_traj != []:
-            print("the transit path for %s arm is successfully found" % req.armType)
+        if prePicking_traj != []:
+            print("the transit (pre-picking) path for %s arm is successfully found" % req.armType)
+            transit_traj += prePicking_traj
         else:
-            print("the transit path for %s arm is not successfully found" % req.armType)
+            print("the transit (pre-picking) path for %s arm is not successfully found" % req.armType)
             return RearrangeCylinderObjectResponse(False)
+        #######################################################################################################
 
+        ##################### cartesian path from pre-picking to picking configuration ########################
         currConfig = self.getCurrentConfig(req.armType)
         ### you are reaching here since pre-picking has been reached, now get the path from pre-picking to picking
-        result_traj = []
-        config_edge_traj = self.planner_p.generateTrajectory_DirectConfigPath(
-                            currConfig, configToPickingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
-        result_traj.append(config_edge_traj)
+        prePickToPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
+                    currConfig, configToPickingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
+        transit_traj += prePickToPickTraj
+        #######################################################################################################
 
+        ######################################### attach the object ###########################################
         ### Now we need to attach the object in hand before transferring the object
         self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
+        #######################################################################################################
 
-        ### generate post-picking pose
+        ############# generate post-picking pose + cartesian move from picking to post-picking ################
+        ### current the post-picking does not undergo the validity check (assume post-picking always work)
         postPickingPose = copy.deepcopy(pickingPose)
         postPickingPose[0][2] += 0.05
         isPoseValid, configToPostPickingPose = self.planner_p.generateConfigBasedOnPose(
                     postPickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
-
         currConfig = self.getCurrentConfig(req.armType)
-        result_traj = []
-        config_edge_traj = self.planner_p.generateTrajectory_DirectConfigPath(
-                            currConfig, configToPostPickingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
-        result_traj.append(config_edge_traj)
-
+        pickToPostPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
+                currConfig, configToPostPickingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
+        transfer_traj += pickToPostPickTraj
+        ########################################################################################################
+        
+        ########################## generate placing pose + pre-placing pose ####################################
         currConfig = self.getCurrentConfig(req.armType)
         placingPose = self.provide_pose_for_object(req.object_idx, "placing")
         isPoseValid, configToPlacingPose = self.planner_p.generateConfigBasedOnPose(
                     placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
-        
         if not isPoseValid:
             print("this pose is not even valid, let alone generating pre-placing")
             return RearrangeCylinderObjectResponse(isPoseValid)
@@ -203,41 +213,34 @@ class PybulletPlanScene(object):
                 print("the pre-placing pose is not valid, thus the placing pose is deemed as invalid as well")
                 return RearrangeCylinderObjectResponse(isPoseValid)
         print("both placing pose and pre-placing pose are legitimate. Proceed to planning.")
+        #######################################################################################################
         
-        result_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePlacingPose, req.object_idx,
+        ########################## plan the path to pre-placing configuration #################################
+        prePlacing_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePlacingPose, req.object_idx,
                                             self.robot_p, self.workspace_p, req.armType, "transfer")
         ### the planning has been finished, either success or failure
-        if result_traj != []:
-            print("the transfer path for %s arm is successfully found" % req.armType)
+        if prePlacing_traj != []:
+            print("the transfer (pre-placing) path for %s arm is successfully found" % req.armType)
+            transfer_traj += prePlacing_traj
         else:
-            print("the transfer path for %s arm is not successfully found" % req.armType)
+            print("the transfer (pre-placing) path for %s arm is not successfully found" % req.armType)
             return RearrangeCylinderObjectResponse(False)
-        
+        #######################################################################################################
+
+        ##################### cartesian path from pre-placing to placing configuration ########################
         currConfig = self.getCurrentConfig(req.armType)
         ### you are reaching here since pre-placing has been reached, now get the path from pre-placing to placing
-        result_traj = []
-        config_edge_traj = self.planner_p.generateTrajectory_DirectConfigPath(
-                            currConfig, configToPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
-        result_traj.append(config_edge_traj)
+        prePlaceToPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
+                    currConfig, configToPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
+        transfer_traj += prePlaceToPlaceTraj
+        #######################################################################################################
 
-        # isPoseValid, configToPlacingPose = self.planner_p.generateConfigBasedOnPose(
-        #             placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
-        # print("IS POSE VALID?????????", isPoseValid)
-        # if not isPoseValid:
-        #     print("this placing pose is not even valid. No motion planning will be attempted")
-        #     return RearrangeCylinderObjectResponse(False)
-        # print("the placing pose is legitimate. Proceed to planning.")
-
-        # result_traj = self.planner_p.AstarPathFinding(currConfig, configToPlacingPose, req.object_idx,
-        #                                     self.robot_p, self.workspace_p, req.armType, "transfer")
-        # if result_traj != []:
-        #     print("the transfer path for %s arm is successfully found" % req.armType)
-        # else:
-        #     print("the transfer path for %s arm is not successfully found" % req.armType)
-        #     return RearrangeCylinderObjectResponse(False)
-
-        ### detach the object
+        ######################################### detach the object ###########################################
+        ### Now we need to detach the object in hand before retracting the object (post-placing)
         self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
+        #######################################################################################################
+
+        ############# generate post-placing pose + cartesian move from placing to post-placing ################
         ### retract the arm from the object
         currConfig = self.getCurrentConfig(req.armType)
         isPoseValid, postPlacingPose, configToPostPlacingPose = self.planner_p.generatePrePickingOrPostPlacingPose(
@@ -245,16 +248,16 @@ class PybulletPlanScene(object):
         if not isPoseValid:
             print("The post-placing pose is not valid")
             return RearrangeCylinderObjectResponse(isPoseValid)
-        print("post-placing is legitimate. Proceed to planning.")
-
+        print("post-placing is legitimate. Cartesian move please")
         ### we need to check if a transition from targetPose to post-placement pose will work
-        result_traj = []
-        config_edge_traj = self.planner_p.generateTrajectory_DirectConfigPath(
+        placeToPostPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
                             currConfig, configToPostPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
-        result_traj.append(config_edge_traj)
-
+        finish_traj += placeToPostPlaceTraj
+        ########################################################################################################
+        
+        ### get the current state
         currConfig = self.getCurrentConfig(req.armType)
-
+        ### congrat! No problem of rearranging the current object
         return RearrangeCylinderObjectResponse(True)
 
 

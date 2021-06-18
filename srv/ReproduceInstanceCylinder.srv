@@ -2,6 +2,6 @@
 # for reproducing an instance of cylindrical objects in the scene
 # given the perception output (cylinder_objects)
 
-CylinderObj[] cylinder_objects
+uniform_object_rearrangement/CylinderObj[] cylinder_objects
 ---
 bool success
