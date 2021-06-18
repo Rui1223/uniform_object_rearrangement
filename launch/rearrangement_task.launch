@@ -1,0 +1,28 @@
+<launch>
+    <!-- launch specification file to get parameters for the task -->
+    <include file="$(find uniform_object_rearrangement)/launch/task_specification.launch"></include>
+	
+    <!-- <node pkg="uniform_object_rearrangement" type="PybulletExecutionScene.py" name="pybullet_execution_scene"
+		args="$(arg pybullet_execution_scene)" output="screen" required="True" /> -->
+
+    <node pkg="uniform_object_rearrangement" type="PybulletExecutionScene.py" name="pybullet_execution_scene"
+		    output="screen" required="True" />
+
+    <node pkg="uniform_object_rearrangement" type="PybulletPlanScene.py" name="pybullet_plan_scene"
+		    output="screen" required="True" />
+    
+    <!-- the following node expects argument RearrangementTaskPlanner <num_objects(int)> -->
+    <node pkg="uniform_object_rearrangement" type="RearrangementTaskPlanner.py" name="rearrangement_task_planner"
+        args="$(arg rearrangement_task_planner)" output="screen" required="False" />
+
+    <node pkg="uniform_object_rearrangement" type="PoseEstimator.py" name="fake_pose_estimator"
+        output="screen" required="False" />
+
+      <node pkg="uniform_object_rearrangement" type="main_planner_node" name="main_planner" output="screen" />
+	
+	<!-- <include file="$(find motoman_moveit_config)/launch/demo.launch"></include>
+	<include file="$(find moveit_tutorials)/doc/move_group_interface/launch/move_group_interface_planning_scene.launch"></include> -->
+
+
+   
+</launch>

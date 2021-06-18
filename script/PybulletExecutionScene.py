@@ -1,0 +1,251 @@
+#!/usr/bin/env python
+from __future__ import division
+
+import pybullet as p
+import pybullet_data
+
+import time
+import sys
+import os
+import numpy as np
+from cv_bridge import CvBridge, CvBridgeError
+import cv2
+
+from MotomanRobot import MotomanRobot
+from WorkspaceTable import WorkspaceTable
+from SimulatedCamera import SimulatedCamera
+
+import rospy
+import rospkg
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+
+from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderResponse
+from uniform_object_rearrangement.srv import CylinderPoseEstimate, CylinderPoseEstimateResponse
+
+############################### description ###############################
+### This class defines a PybulletExecutionScene class which
+### generates an execution scene that
+### (1) sets up the robot, table and camera
+### (2) generate an arrangement instance
+### (2) execute the computed plan
+###########################################################################
+
+class PybulletExecutionScene(object):
+
+    def __init__(self, args):
+        ### read in relevant ros parameters for execution scene
+        basePosition, baseOrientation, urdfFile, \
+        leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, \
+        standingBase_dim, table_dim, table_offset_x, \
+        camera_extrinsic, camera_intrinsic, \
+        self.cylinder_radius, self.cylinder_height, \
+        constrained_area_dim, thickness_flank, back_distance, \
+        object_mesh_path = self.readROSParam()
+        ### set the rospkg path
+        rospack = rospkg.RosPack()
+        self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
+
+        ### set the server for the pybullet execution scene
+        # self.executingClientID = p.connect(p.DIRECT)
+        self.executingClientID = p.connect(p.GUI)
+        # p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        # self.egl_plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
+        # print("plugin=", self.egl_plugin)
+
+        ### configure the robot
+        self.configureMotomanRobot(urdfFile, basePosition, baseOrientation, \
+            leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, True)
+        ### setup the workspace
+        self.setupWorkspace(standingBase_dim, table_dim, table_offset_x, object_mesh_path, True)
+        self.workspace_e.addConstrainedArea(constrained_area_dim, thickness_flank, back_distance)
+        self.setupCamera(camera_extrinsic, camera_intrinsic)
+
+
+    def configureMotomanRobot(self, 
+            urdfFile, basePosition, baseOrientation,
+            leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, isPhysicsTurnOn):
+        ### This function configures the robot in the real scene ###
+        self.robot_e = MotomanRobot(
+            os.path.join(self.rosPackagePath, urdfFile), 
+            basePosition, baseOrientation, 
+            leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration,
+            isPhysicsTurnOn, self.executingClientID)
+
+    def setupWorkspace(self,
+            standingBase_dim, table_dim, table_offset_x,
+            object_mesh_path, isPhysicsTurnOn):
+        ### This function sets up the workspace ###
+        self.workspace_e = WorkspaceTable(self.robot_e.basePosition,
+            standingBase_dim, table_dim, table_offset_x, 
+            os.path.join(self.rosPackagePath, object_mesh_path),
+            isPhysicsTurnOn, self.executingClientID)
+
+    def setupCamera(self, camera_extrinsic, camera_intrinsic):
+        ### This function sets up the camera ###
+        ### indicate which scene you are working on and whether you want to save images
+
+        self.scene_index = "1"
+        self.saveImages = False ### decide whether to save images or not
+        # self.scene_index = args[1]
+        # self.saveImages = (args[2] in ('y', 'Y')) ### decide whether to save images or not
+        self.camera_e = SimulatedCamera(
+            self.workspace_e.tablePosition, self.workspace_e.table_dim,
+            camera_extrinsic, camera_intrinsic,
+            self.scene_index, self.saveImages,
+            self.executingClientID
+        )
+
+    
+    def rosInit(self):
+        ### This function specifies the role of a node instance for this class ###
+        ### and initialize a ros node
+        self.color_im_pub = rospy.Publisher('rgb_images', Image, queue_size=10)
+        self.depth_im_pub = rospy.Publisher('depth_images', Image, queue_size=10)
+        self.generate_instance_cylinder_server = rospy.Service(
+            "generate_instance_cylinder", GenerateInstanceCylinder, 
+            self.generate_instance_cylinder_callback)
+        self.cylinder_pose_estimate_server = rospy.Service(
+            "cylinder_pose_estimate", CylinderPoseEstimate, self.cylinder_pose_estimate_callback)
+
+        rospy.init_node("pybullet_execution_scene", anonymous=True)
+
+    
+    def cylinder_pose_estimate_callback(self, req):
+        rospy.logwarn("GET THE INFORMATION OF OBJECTS")
+        cylinder_objects = self.workspace_e.obtainCylinderObjectsInfo()
+        if cylinder_objects != []:
+            print("successfully obtain objects information")
+        else:
+            print("fail to obtain object information")
+        return CylinderPoseEstimateResponse(cylinder_objects)
+
+
+    def generate_instance_cylinder_callback(self, req):
+        ### given the request data: num_objects (int32)
+        rospy.logwarn("GENERATE REARRANGEMENT INSTANCE")
+        self.num_objects = req.num_objects
+        # success = self.workspace_e.generateInstance_fix(
+        #         self.cylinder_radius, self.cylinder_height, self.num_objects)
+        success = self.workspace_e.generateInstance_fix(
+                self.cylinder_radius, self.cylinder_height, self.num_objects)
+        if success == True:
+            print("successfully generate an instance")
+        else:
+            print("fail to generate an instance")
+        return GenerateInstanceCylinderResponse(success)
+
+
+    def readROSParam(self):
+        ### This functions read in needed ROS parameters
+        while not rospy.has_param('/motoman_robot/basePosition'):
+            rospy.sleep(0.2)
+        basePosition = rospy.get_param('/motoman_robot/basePosition')
+
+        while not rospy.has_param('/motoman_robot/baseOrientation'):
+            rospy.sleep(0.2)
+        baseOrientation = rospy.get_param('/motoman_robot/baseOrientation')
+
+        while not rospy.has_param('/motoman_robot/urdfFile'):
+            rospy.sleep(0.2)
+        urdfFile = rospy.get_param('/motoman_robot/urdfFile')
+
+        while not rospy.has_param('/motoman_robot/leftArmHomeConfiguration'):
+            rospy.sleep(0.2)
+        leftArmHomeConfiguration = rospy.get_param('/motoman_robot/leftArmHomeConfiguration')
+
+        while not rospy.has_param('/motoman_robot/rightArmHomeConfiguration'):
+            rospy.sleep(0.2)
+        rightArmHomeConfiguration = rospy.get_param('/motoman_robot/rightArmHomeConfiguration')
+
+        while not rospy.has_param('/motoman_robot/torsoHomeConfiguration'):
+            rospy.sleep(0.2)
+        torsoHomeConfiguration = rospy.get_param('/motoman_robot/torsoHomeConfiguration')
+
+        while not rospy.has_param('/workspace_table/standingBase_dim'):
+            rospy.sleep(0.2)
+        standingBase_dim = rospy.get_param('/workspace_table/standingBase_dim')
+
+        while not rospy.has_param('/workspace_table/table_dim'):
+            rospy.sleep(0.2)
+        table_dim = rospy.get_param('/workspace_table/table_dim')
+
+        while not rospy.has_param('/workspace_table/table_offset_x'):
+            rospy.sleep(0.2)
+        table_offset_x = rospy.get_param('/workspace_table/table_offset_x')
+
+        while not rospy.has_param('/simulated_camera/camera_extrinsic'):
+            rospy.sleep(0.2)
+        camera_extrinsic = rospy.get_param('/simulated_camera/camera_extrinsic')
+
+        while not rospy.has_param('/simulated_camera/camera_intrinsic'):
+            rospy.sleep(0.2)
+        camera_intrinsic = rospy.get_param('/simulated_camera/camera_intrinsic')
+
+        while not rospy.has_param('/uniform_cylinder_object/radius'):
+            rospy.sleep(0.2)
+        cylinder_radius = rospy.get_param('/uniform_cylinder_object/radius')
+
+        while not rospy.has_param('/uniform_cylinder_object/height'):
+            rospy.sleep(0.2)
+        cylinder_height = rospy.get_param('/uniform_cylinder_object/height')
+
+        while not rospy.has_param('/constrained_area/constrained_area_dim'):
+            rospy.sleep(0.2)
+        constrained_area_dim = rospy.get_param('/constrained_area/constrained_area_dim')
+
+        while not rospy.has_param('/constrained_area/thickness_flank'):
+            rospy.sleep(0.2)
+        thickness_flank = rospy.get_param('/constrained_area/thickness_flank')
+
+        while not rospy.has_param('/constrained_area/back_distance'):
+            rospy.sleep(0.2)
+        back_distance = rospy.get_param('/constrained_area/back_distance')
+
+        while not rospy.has_param('/object_mesh_to_drop_in_real_scene/object_mesh_path'):
+            rospy.sleep(0.2)
+        object_mesh_path = rospy.get_param('/object_mesh_to_drop_in_real_scene/object_mesh_path')
+
+        return basePosition, baseOrientation, urdfFile, \
+            leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, \
+            standingBase_dim, table_dim, table_offset_x, \
+            camera_extrinsic, camera_intrinsic, \
+            cylinder_radius, cylinder_height, \
+            constrained_area_dim, thickness_flank, back_distance, \
+            object_mesh_path
+
+
+def main(args):
+    pybullet_execution_scene = PybulletExecutionScene(args)
+    pybullet_execution_scene.rosInit()
+    rate = rospy.Rate(10) ### 10hz
+    bridge = CvBridge()
+
+    count = 0
+
+    while not rospy.is_shutdown():
+        ### get the time stamp
+        time_stamp = rospy.get_time()
+        # rospy.loginfo("time stamp for image and joint state publisher %s" % time_stamp)
+
+        rgbImg, depthImg = pybullet_execution_scene.camera_e.takeRGBImage()
+        # rgb_msg = bridge.cv2_to_imgmsg(rgbImg, 'rgb8')
+        # depth_msg = bridge.cv2_to_imgmsg((1000 * depthImg).astype(np.uint16), 'mono16')
+        # pybullet_execution_scene.color_im_pub.publish(rgb_msg)
+        # pybullet_execution_scene.depth_im_pub.publish(depth_msg)
+        if count == 0:
+            cv2.imwrite(
+                os.path.expanduser(os.path.join(pybullet_execution_scene.rosPackagePath, "sensor_images/color.png")), 
+                cv2.cvtColor(rgbImg, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(
+                os.path.expanduser(os.path.join(pybullet_execution_scene.rosPackagePath, "sensor_images/depth.png")), 
+                (1000 * depthImg).astype(np.uint16))
+            
+
+        count += 1
+
+
+        rate.sleep()
+
+if __name__ == '__main__':
+    main(sys.argv)

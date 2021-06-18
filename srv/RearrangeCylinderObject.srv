@@ -1,0 +1,7 @@
+# This srv file defines the service
+# for rearranging a specified cylinder object
+
+int32 object_idx
+string armType
+---
+bool success
