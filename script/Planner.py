@@ -209,7 +209,8 @@ class Planner(object):
         f_connection.close()
 
 
-    def updateRealObjectBasedonLocalPose(self, object_idx, robot, workspace, armType):
+    def updateMeshBasedonLocalPose(self, object_idx, robot, workspace, armType):
+        ### the planning version of the API "updateRealObjectBasedonLocalPose" in executor
         if armType == "Left" or armType == "Left_torso":
             # ee_idx = robot.left_ee_idx
             # objectInHand = self.objectInLeftHand
@@ -445,7 +446,7 @@ class Planner(object):
         ### If currently it is in hand manipulation, also move the object
         if (self.isObjectInLeftHand and (armType == "Left" or armType == "Left_torso")) or \
                     (self.isObjectInRightHand and (armType == "Right" or armType == "Right_torso")):
-            self.updateRealObjectBasedonLocalPose(object_idx, robot, workspace, armType)
+            self.updateMeshBasedonLocalPose(object_idx, robot, workspace, armType)
 
         isValid = self.checkIK_CollisionWithRobotAndKnownGEO(
                                             singleArmConfig_IK, robot, workspace, armType)
@@ -687,7 +688,7 @@ class Planner(object):
                 interm_j6 = n1[6] + (n2[6]-n1[6]) / nseg * i
                 intermNode = [interm_j0, interm_j1, interm_j2, interm_j3, interm_j4, interm_j5, interm_j6]
                 robot.setSingleArmToConfig(intermNode, armType)
-                time.sleep(0.1)
+                # time.sleep(0.1)
                 config_edge_traj.append(intermNode)
         
         if armType == "Left_torso" or armType == "Right_torso":
@@ -710,9 +711,9 @@ class Planner(object):
                 ########## temporarily add here for visualization ##########
                 if (self.isObjectInLeftHand and (armType == "Left" or armType == "Left_torso")) or \
                             (self.isObjectInRightHand and (armType == "Right" or armType == "Right_torso")):
-                    self.updateRealObjectBasedonLocalPose(object_idx, robot, workspace, armType)
+                    self.updateMeshBasedonLocalPose(object_idx, robot, workspace, armType)
                 ############################################################
-                time.sleep(0.1)
+                # time.sleep(0.1)
                 config_edge_traj.append(intermNode)
 
         return config_edge_traj

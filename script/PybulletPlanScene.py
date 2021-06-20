@@ -14,14 +14,17 @@ import numpy as np
 import rospy
 import rospkg
 from std_msgs.msg import String
+from sensor_msgs.msg import JointState
 
 from MotomanRobot import MotomanRobot
 from WorkspaceTable import WorkspaceTable
 from Planner import Planner
 
-from uniform_object_rearrangement.msg import CylinderObj
+from uniform_object_rearrangement.msg import ArmTrajectory
+from uniform_object_rearrangement.msg import ObjectRearrangePath
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderResponse
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectResponse
+
 
 
 ################################## description #####################################
@@ -131,10 +134,45 @@ class PybulletPlanScene(object):
         return targetPose
 
 
+    def generateArmTrajectory(self, traj, armType, motomanRJointNames):
+        '''generate arm trajectory (a list of JointState)
+        inputs
+        ======
+            traj (a list of list): a list of joint states [q1, q2, ..., qn]
+            armType (string): the arm type (e.g., "Left", "Right_torso)
+            motomanRJointNames (a list of strings): the names for controllable joints
+        outputs
+        =======
+            result_traj (ArmTrajectory()): the resulting trajectory (ArmTrajectory object)
+        '''
+        result_traj = ArmTrajectory()
+        result_traj.armType = armType
+        if armType == "Left" or armType == "Left_torso":
+            first_joint_index = 1
+        if armType == "Right" or armType == "Right_torso":
+            first_joint_index = 8
+        if armType == "Left_torso" or armType == "Right_torso":
+            jointNames = [motomanRJointNames[0]] + motomanRJointNames[first_joint_index:first_joint_index+7]
+        if armType == "Left" or armType == "Right":
+            jointNames = motomanRJointNames[first_joint_index:first_joint_index+7]
+
+        print(type(motomanRJointNames[0]))
+        print(type(jointNames[0]))
+        print("=============================")
+        for config in traj:
+            joint_state = JointState()
+            joint_state.name = jointNames
+            joint_state.position = config
+            result_traj.trajectory.append(joint_state)
+        
+        return result_traj
+        
+
     def rearrange_cylinder_object_callback(self, req):
         ### given the specified cylinder object and the armType
         rospy.logwarn("PLANNING TO REARRANGE THE OBJECT")
         print("object: {}".format(req.object_idx))
+        object_path = ObjectRearrangePath()
         transit_traj = []
         transfer_traj = []
         finish_traj = []
@@ -146,7 +184,7 @@ class PybulletPlanScene(object):
                     pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
         if not isPoseValid:
             print("this pose is not even valid, let alone generating pre-picking")
-            return RearrangeCylinderObjectResponse(isPoseValid)
+            return RearrangeCylinderObjectResponse(isPoseValid, object_path)
         else:
             print("the picking pose is valid, generate pre-picking")
             isPoseValid, prePickingPose, configToPrePickingPose = \
@@ -154,7 +192,7 @@ class PybulletPlanScene(object):
                     pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
             if not isPoseValid:
                 print("the pre-picking pose is not valid, thus the picking pose is deemed as invalid as well")
-                return RearrangeCylinderObjectResponse(isPoseValid)
+                return RearrangeCylinderObjectResponse(isPoseValid, object_path)
         print("both picking pose and pre-picking pose are legitimate. Proceed to planning.")
         #######################################################################################################
 
@@ -167,7 +205,7 @@ class PybulletPlanScene(object):
             transit_traj += prePicking_traj
         else:
             print("the transit (pre-picking) path for %s arm is not successfully found" % req.armType)
-            return RearrangeCylinderObjectResponse(False)
+            return RearrangeCylinderObjectResponse(False, object_path)
         #######################################################################################################
 
         ##################### cartesian path from pre-picking to picking configuration ########################
@@ -202,7 +240,7 @@ class PybulletPlanScene(object):
                     placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
         if not isPoseValid:
             print("this pose is not even valid, let alone generating pre-placing")
-            return RearrangeCylinderObjectResponse(isPoseValid)
+            return RearrangeCylinderObjectResponse(isPoseValid, object_path)
         else:
             print("the placing pose is valid, generate pre-placing")
             prePlacingPose = copy.deepcopy(placingPose)
@@ -211,7 +249,7 @@ class PybulletPlanScene(object):
                         prePlacingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
             if not isPoseValid:
                 print("the pre-placing pose is not valid, thus the placing pose is deemed as invalid as well")
-                return RearrangeCylinderObjectResponse(isPoseValid)
+                return RearrangeCylinderObjectResponse(isPoseValid, object_path)
         print("both placing pose and pre-placing pose are legitimate. Proceed to planning.")
         #######################################################################################################
         
@@ -224,7 +262,7 @@ class PybulletPlanScene(object):
             transfer_traj += prePlacing_traj
         else:
             print("the transfer (pre-placing) path for %s arm is not successfully found" % req.armType)
-            return RearrangeCylinderObjectResponse(False)
+            return RearrangeCylinderObjectResponse(False, object_path)
         #######################################################################################################
 
         ##################### cartesian path from pre-placing to placing configuration ########################
@@ -247,18 +285,28 @@ class PybulletPlanScene(object):
                     placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
         if not isPoseValid:
             print("The post-placing pose is not valid")
-            return RearrangeCylinderObjectResponse(isPoseValid)
+            return RearrangeCylinderObjectResponse(isPoseValid, object_path)
         print("post-placing is legitimate. Cartesian move please")
         ### we need to check if a transition from targetPose to post-placement pose will work
         placeToPostPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
-                            currConfig, configToPostPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
+                currConfig, configToPostPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
         finish_traj += placeToPostPlaceTraj
         ########################################################################################################
         
+        ################################# prepare the path for the object ######################################
         ### get the current state
         currConfig = self.getCurrentConfig(req.armType)
         ### congrat! No problem of rearranging the current object
-        return RearrangeCylinderObjectResponse(True)
+        ### prepare the object path
+        object_path.transit_trajectory = self.generateArmTrajectory(
+                                            transit_traj, req.armType, self.robot_p.motomanRJointNames)
+        object_path.transfer_trajectory = self.generateArmTrajectory(
+                                            transfer_traj, req.armType, self.robot_p.motomanRJointNames)
+        object_path.finish_trajectory = self.generateArmTrajectory(
+                                            finish_traj, req.armType, self.robot_p.motomanRJointNames)
+        object_path.object_idx = req.object_idx
+        return RearrangeCylinderObjectResponse(True, object_path)
+        ########################################################################################################
 
 
 
@@ -342,22 +390,3 @@ def main(args):
 
 if __name__ == '__main__':
     main(sys.argv)
-
-
-
-##################################### temporarily kept here #####################################
-### we need to check if a transition from pre-grasp to final grasp will work
-# isDirectPathValid = self.planner_p.checkEdgeValidity_DirectConfigPath(
-#                         configToPreGraspPose, configToGraspPose, req.object_idx, 
-#                         self.robot_p, self.workspace_p, req.armType, "transit")
-# if isDirectPathValid:
-#     result_traj = []
-#     config_edge_traj = self.planner_p.generateTrajectory_DirectConfigPath(
-#                         configToPreGraspPose, configToGraspPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
-#     result_traj.append(config_edge_traj)
-
-# if result_traj != []:
-#     print("the pregrasp->grasp path for %s arm is successfully found" % req.armType)
-# else:
-#     print("the pregrasp->grasp path for %s arm is not successfully found" % req.armType)
-#     return RearrangeCylinderObjectResponse(False)

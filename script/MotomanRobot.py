@@ -91,9 +91,9 @@ class MotomanRobot(object):
         self.rp = [torsoConfiguration] + list(leftArmConfiguration) + list(rightArmConfiguration) + list(rightHandConfiguration)
 
     def updateSingleArmConfig(self, currSingleArmConfig, armType):
-        if armType == "Left":
+        if armType == "Left" or armType == "Left_torso":
             self.leftArmCurrConfiguration = currSingleArmConfig
-        else:
+        if armType == "Right" or armType == "Right_torso":
             self.rightArmCurrConfiguration = currSingleArmConfig
     
     def updateTorsoConfig(self, torsoConfig):
@@ -156,7 +156,6 @@ class MotomanRobot(object):
         self.setRestPoses(
             self.torsoCurrConfiguration, resetArmConfiguration[0:7], resetArmConfiguration[7:14], self.rightHandCurrConfiguration)
 
-
     def resetArmConfig_torso(self, resetArmConfiguration, resetTorsoConfiguration):
         p.resetJointState(self.motomanGEO, 0, resetTorsoConfiguration, physicsClientId=self.server)
         self.updateTorsoConfig(resetTorsoConfiguration)
@@ -176,6 +175,7 @@ class MotomanRobot(object):
         self.setRestPoses(
             resetTorsoConfiguration, resetArmConfiguration[0:7], resetArmConfiguration[7:14], self.rightHandCurrConfiguration)
 
+
     def setSingleArmToConfig(self, singleArmConfig, armType):
         ### the planning version of moveSingArm
         if armType == "Left":
@@ -184,17 +184,15 @@ class MotomanRobot(object):
             self.updateSingleArmConfig(singleArmConfig, armType)
             for j in range(11, 18):
                 p.resetJointState(self.motomanGEO, j, self.rightArmCurrConfiguration[j-11], physicsClientId=self.server)
-            ### keep the right hand/gripper unchanged
-            self.keepCurrRightHandConfig()
         if armType == "Right":
             for j in range(1, 8):
                 p.resetJointState(self.motomanGEO, j, self.leftArmCurrConfiguration[j-1], physicsClientId=self.server)
             for j in range(11, 18):
                 p.resetJointState(self.motomanGEO, j, singleArmConfig[j-11], physicsClientId=self.server)
             self.updateSingleArmConfig(singleArmConfig, armType)
-            ### keep the right hand/gripper and torso unchanged
-            self.keepCurrRightHandConfig()
-            self.keepTorsoConfig()
+        ### keep the right hand/gripper and torso unchanged
+        self.keepCurrRightHandConfig()
+        self.keepTorsoConfig()
         p.stepSimulation(physicsClientId=self.server)
         left_ee_pos_quat = p.getLinkState(self.motomanGEO, self.left_ee_idx, physicsClientId=self.server)
         self.left_ee_pose = [list(left_ee_pos_quat[0]), list(left_ee_pos_quat[1])]
@@ -207,7 +205,6 @@ class MotomanRobot(object):
             self.setRestPoses(
                 self.torsoCurrConfiguration, self.leftArmCurrConfiguration, singleArmConfig, self.rightHandCurrConfiguration)
 
-
     def setSingleArmToConfig_torso(self, singleArmConfig, torsoConfig, armType):
         ### the planning version of moveSingArm
         p.resetJointState(self.motomanGEO, 0, torsoConfig, physicsClientId=self.server)
@@ -218,16 +215,14 @@ class MotomanRobot(object):
             self.updateSingleArmConfig(singleArmConfig, "Left")
             for j in range(11, 18):
                 p.resetJointState(self.motomanGEO, j, self.rightArmCurrConfiguration[j-11], physicsClientId=self.server)
-            ### keep the right hand/gripper unchanged
-            self.keepCurrRightHandConfig()
-        else:
+        if armType == "Right_torso":
             for j in range(1, 8):
                 p.resetJointState(self.motomanGEO, j, self.leftArmCurrConfiguration[j-1], physicsClientId=self.server)
             for j in range(11, 18):
                 p.resetJointState(self.motomanGEO, j, singleArmConfig[j-11], physicsClientId=self.server)
             self.updateSingleArmConfig(singleArmConfig, "Right")
-            ### keep the right hand/gripper unchanged
-            self.keepCurrRightHandConfig()
+        ### keep the right hand/gripper unchanged
+        self.keepCurrRightHandConfig()
         p.stepSimulation(physicsClientId=self.server)
         left_ee_pos_quat = p.getLinkState(self.motomanGEO, self.left_ee_idx, physicsClientId=self.server)
         self.left_ee_pose = [list(left_ee_pos_quat[0]), list(left_ee_pos_quat[1])]
@@ -241,17 +236,23 @@ class MotomanRobot(object):
                 torsoConfig, self.leftArmCurrConfiguration, singleArmConfig, self.rightHandCurrConfiguration)
 
 
-    def moveSingleArm(self, singleArmConfiguration, armType):
+    def moveSingleArm(self, singleArmConfig, armType):
         ### move single arm by resetJointState() function
         if armType == "Left":
             for j in range(1, 8):
-                p.resetJointState(self.motomanGEO, j, singleArmConfiguration[j-1], physicsClientId=self.server)
-            self.updateSingleArmConfig(singleArmConfiguration, armType)
-
-        else:
+                p.resetJointState(self.motomanGEO, j, singleArmConfig[j-1], physicsClientId=self.server)
+            self.updateSingleArmConfig(singleArmConfig, armType)
             for j in range(11, 18):
-                p.resetJointState(self.motomanGEO, j, singleArmConfiguration[j-11], physicsClientId=self.server)
-            self.updateSingleArmConfig(singleArmConfiguration, armType)
+                p.resetJointState(self.motomanGEO, j, self.rightArmCurrConfiguration[j-11], physicsClientId=self.server)
+        if armType == "Right":
+            for j in range(1, 8):
+                p.resetJointState(self.motomanGEO, j, self.leftArmCurrConfiguration[j-1], physicsClientId=self.server)
+            for j in range(11, 18):
+                p.resetJointState(self.motomanGEO, j, singleArmConfig[j-11], physicsClientId=self.server)
+            self.updateSingleArmConfig(singleArmConfig, armType)
+        ### keep the right hand/gripper and torso unchanged
+        self.keepCurrRightHandConfig()
+        self.keepTorsoConfig()
         ###### This function is in maintenance ###### 
         # p.stepSimulation(physicsClientId=self.server)
         left_ee_pos_quat = p.getLinkState(self.motomanGEO, self.left_ee_idx, physicsClientId=self.server)
@@ -260,19 +261,24 @@ class MotomanRobot(object):
         self.right_ee_pose = [list(right_ee_pos_quat[0]), list(right_ee_pos_quat[1])]
 
 
-    def moveSingleArm_torso(self, singleArmConfiguration, torsoConfiguration, armType):
+    def moveSingleArm_torso(self, singleArmConfig, torsoConfig, armType):
         ### move single arm by resetJointState() function
-        p.resetJointState(self.motomanGEO, 0, torsoConfiguration, physicsClientId=self.server)
-        self.updateTorsoConfig(torsoConfiguration)
+        p.resetJointState(self.motomanGEO, 0, torsoConfig, physicsClientId=self.server)
+        self.updateTorsoConfig(torsoConfig)
         if armType == "Left_torso":
             for j in range(1, 8):
                 p.resetJointState(self.motomanGEO, j, singleArmConfiguration[j-1], physicsClientId=self.server)
-            self.updateSingleArmConfig(singleArmConfiguration, armType)
-
-        else:
+            self.updateSingleArmConfig(singleArmConfiguration, "Left")
             for j in range(11, 18):
-                p.resetJointState(self.motomanGEO, j, singleArmConfiguration[j-11], physicsClientId=self.server)
-            self.updateSingleArmConfig(singleArmConfiguration, armType)
+                p.resetJointState(self.motomanGEO, j, self.rightArmCurrConfiguration[j-11], physicsClientId=self.server)
+        if armType == "Right_torso":
+            for j in range(1, 8):
+                p.resetJointState(self.motomanGEO, j, self.leftArmCurrConfiguration[j-1], physicsClientId=self.server)
+            for j in range(11, 18):
+                p.resetJointState(self.motomanGEO, j, singleArmConfig[j-11], physicsClientId=self.server)
+            self.updateSingleArmConfig(singleArmConfig, "Right")
+        ### keep the right hand/gripper unchanged
+        self.keepCurrRightHandConfig()
         ###### This function is in maintenance ###### 
         # p.stepSimulation(physicsClientId=self.server)
         left_ee_pos_quat = p.getLinkState(self.motomanGEO, self.left_ee_idx, physicsClientId=self.server)
@@ -305,7 +311,7 @@ class MotomanRobot(object):
 
     def getRobotJointInfo(self):
         ################# information related to Motoman arm (joint info) #################
-        ### output: self.motomanRJointNames [7 left joints, 7 right joints] 14*1        
+        ### output: self.motomanRJointNames [torso joint, 7 left joints, 7 right joints, hand joints]        
         self.motomanRJointNames = []
         num_joints = p.getNumJoints(self.motomanGEO, self.server)
         for i in range(num_joints):
@@ -313,7 +319,7 @@ class MotomanRobot(object):
             # print(jointInfo)
             if jointInfo[2] == 0:
                 ### only get revolute joint
-                self.motomanRJointNames.append(jointInfo[1])
+                self.motomanRJointNames.append(jointInfo[1].decode())
         # self.printRJointNames()
 
 

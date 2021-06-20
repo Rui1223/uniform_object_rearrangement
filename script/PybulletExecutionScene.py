@@ -14,6 +14,7 @@ import cv2
 from MotomanRobot import MotomanRobot
 from WorkspaceTable import WorkspaceTable
 from SimulatedCamera import SimulatedCamera
+from Executor import Executor
 
 import rospy
 import rospkg
@@ -22,6 +23,7 @@ from sensor_msgs.msg import Image
 
 from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderResponse
 from uniform_object_rearrangement.srv import CylinderPoseEstimate, CylinderPoseEstimateResponse
+from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryResponse
 
 ############################### description ###############################
 ### This class defines a PybulletExecutionScene class which
@@ -52,6 +54,11 @@ class PybulletExecutionScene(object):
         # p.setAdditionalSearchPath(pybullet_data.getDataPath())
         # self.egl_plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
         # print("plugin=", self.egl_plugin)
+
+        ### create an executor assistant
+        self.executor_e = Executor(self.executingClientID,
+            isObjectInLeftHand=False, isObjectInRightHand=False,
+            objectInLeftHand=None, objectInRightHand=None)        
 
         ### configure the robot
         self.configureMotomanRobot(urdfFile, basePosition, baseOrientation, \
@@ -107,7 +114,8 @@ class PybulletExecutionScene(object):
             self.generate_instance_cylinder_callback)
         self.cylinder_pose_estimate_server = rospy.Service(
             "cylinder_pose_estimate", CylinderPoseEstimate, self.cylinder_pose_estimate_callback)
-
+        self.execute_trajectory_server = rospy.Service(
+            "execute_trajectory", ExecuteTrajectory, self.execute_traj_callback)
         rospy.init_node("pybullet_execution_scene", anonymous=True)
 
     
@@ -119,7 +127,6 @@ class PybulletExecutionScene(object):
         else:
             print("fail to obtain object information")
         return CylinderPoseEstimateResponse(cylinder_objects)
-
 
     def generate_instance_cylinder_callback(self, req):
         ### given the request data: num_objects (int32)
@@ -134,6 +141,13 @@ class PybulletExecutionScene(object):
         else:
             print("fail to generate an instance")
         return GenerateInstanceCylinderResponse(success)
+
+    def execute_traj_callback(self, req):
+        ### given the request data: an ArmTrajectory object
+        ### execute the trajectory on a specified arm
+        self.executor_e.executeTrajectory(
+            req.arm_trajectory.trajectory, self.robot_e, req.arm_trajectory.armType)
+        return ExecuteTrajectoryResponse(True)
 
 
     def readROSParam(self):

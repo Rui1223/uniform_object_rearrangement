@@ -5,3 +5,4 @@ int32 object_idx
 string armType
 ---
 bool success
+uniform_object_rearrangement/ObjectRearrangePath path

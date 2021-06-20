@@ -10,10 +10,12 @@ import rospy
 import rospkg
 
 from uniform_object_rearrangement.msg import CylinderObj
+from uniform_object_rearrangement.msg import ObjectRearrangePath
 from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderRequest
 from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectRequest
+from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
 
 ############################### description ################################
 ### This class defines a RearrangementTaskPlanner class which
@@ -81,9 +83,47 @@ class RearrangementTaskPlanner(object):
             rearrangeCylinderObject_proxy = rospy.ServiceProxy(
                 "rearrange_cylinder_object", RearrangeCylinderObject)
             rearrange_cylinder_object_response = rearrangeCylinderObject_proxy(request)
-            return rearrange_cylinder_object_response.success
+            return rearrange_cylinder_object_response.success, rearrange_cylinder_object_response.path
         except rospy.ServiceException as e:
             print("rearrange_cylinder_object service call failed: %s" % e)
+
+    def serviceCall_execute_trajectory(self, traj):
+        '''call the ExecuteTrajectory service to execute the given trajectory
+        inputs
+        ======
+            traj (an ArmTrajectory object): the trajectory to execute
+        outputs
+        =======
+            success: indicator of whether the trajectory is executed successfully
+        '''
+        rospy.wait_for_service("execute_trajectory")
+        request = ExecuteTrajectoryRequest()
+        request.arm_trajectory = traj
+        try:
+            executeTraj_proxy = rospy.ServiceProxy("execute_trajectory", ExecuteTrajectory)
+            executeTraj_response = executeTraj_proxy(request.arm_trajectory)
+            return executeTraj_response.success
+        except rospy.ServiceException as e:
+            print(" execute_trajectory service call failed: %s" % e)
+        
+
+    def executeWholePlan(self, whole_path):
+        """ call the ExecuteTrajectory service to execute each trajectory in the path
+            also tell the robot to attach or detach the object among the motions 
+            inputs
+            ======
+                whole path (a list of ObjectRearrangementPath): a sequence of object paths
+            outputs
+            =======
+                execute_success (bool): indicate whether success or not
+        """
+        for path in whole_path:
+            ### first execute the transit trajectory in the path
+            self.serviceCall_execute_trajectory(path.transit_trajectory)
+            ### now attach the object
+            
+
+        
 
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
@@ -130,15 +170,23 @@ def main(args):
     # object_ordering = object_ordering.split(",")
     # object_ordering = [int(i) for i in object_ordering]
     # print(object_ordering)
-    object_ordering = [2, 1, 0]
+    # object_ordering = [2, 1, 0]
+    object_ordering = [2]
+    whole_path = []
     # obj_idx = 2
     for obj_idx in object_ordering:
-        rearrange_success = rearrangement_task_planner.serviceCall_rearrangeCylinderObject(obj_idx, "Right_torso")
+        rearrange_success, object_path = rearrangement_task_planner.serviceCall_rearrangeCylinderObject(obj_idx, "Right_torso")
         if not rearrange_success:
             print("oh ow, you failed at object: {}".format(obj_idx))
             break
-    # rearrange_success = rearrangement_task_planner.serviceCall_rearrangeCylinderObject(obj_idx, "Right_torso")
+        ### otherwise get the path
+        whole_path.append(object_path)
 
+    execute_success = rearrangement_task_planner.executeWholePlan(whole_path)
+    if execute_success: 
+        rospy.logwarn("THE REARRANGEMENT TASK IS FULFILLED BY THE ROBOT")
+    else:
+        rospy.logwarn("THE REARRANGEMENT TASK IS NOT FULFILLED BY THE ROBOT")
 
 
     while not rospy.is_shutdown():

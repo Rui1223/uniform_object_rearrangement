@@ -7,3 +7,4 @@
 uniform_object_rearrangement/ArmTrajectory transit_trajectory
 uniform_object_rearrangement/ArmTrajectory transfer_trajectory
 uniform_object_rearrangement/ArmTrajectory finish_trajectory
+int32 object_idx
