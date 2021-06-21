@@ -21,17 +21,13 @@ class Planner_t {
 public:
 
     Graph_t m_right_torso_g;
-    Graph_t m_right_g;
     AstarSolver_t m_astar_solver;
 
     // constructor
     Planner_t() {}
-    Planner_t(std::string right_torso_samples_file, std::string right_torso_connections_file, 
-                std::string right_samples_file, std::string right_connections_file) {
-
+    Planner_t(std::string right_torso_samples_file, std::string right_torso_connections_file) 
+    {
         m_right_torso_g.constructGraph(right_torso_samples_file, right_torso_connections_file);
-        m_right_g.constructGraph(right_samples_file, right_connections_file);
-
     }
 
     bool astarSolverCallback(
@@ -51,19 +47,19 @@ public:
             m_astar_solver.prepareToSearch(m_right_torso_g);
             m_astar_solver.Astar_search(m_right_torso_g);
         }
-        if (req.armType == "Right") {
-            if (m_astar_solver.getQueryIdx() != req.query_idx) {
-                // this is a new query, let's set the new query
-                m_astar_solver.setPlanningQuery(m_right_g, req.query_idx, 
-                    req.start_idx, req.goal_idx, req.start_config, req.goal_config,
-                    req.start_neighbors_idx, req.goal_neighbors_idx,
-                    req.start_neighbors_cost, req.goal_neighbors_cost,
-                    req.violated_edges);
-            }
-            m_right_g.modifyEdge(req.violated_edges, req.query_idx);
-            m_astar_solver.prepareToSearch(m_right_g);
-            m_astar_solver.Astar_search(m_right_g);
-        }
+        // if (req.armType == "Right") {
+        //     if (m_astar_solver.getQueryIdx() != req.query_idx) {
+        //         // this is a new query, let's set the new query
+        //         m_astar_solver.setPlanningQuery(m_right_g, req.query_idx, 
+        //             req.start_idx, req.goal_idx, req.start_config, req.goal_config,
+        //             req.start_neighbors_idx, req.goal_neighbors_idx,
+        //             req.start_neighbors_cost, req.goal_neighbors_cost,
+        //             req.violated_edges);
+        //     }
+        //     m_right_g.modifyEdge(req.violated_edges, req.query_idx);
+        //     m_astar_solver.prepareToSearch(m_right_g);
+        //     m_astar_solver.Astar_search(m_right_g);
+        // }
 
         // let's return the response after a search
         resp.searchSuccess = m_astar_solver.getSearchSuccessInfo();
@@ -93,15 +89,10 @@ int main(int argc, char** argv)
     // load the roadmap for left and right arm
     std::string right_torso_samples_file = package_path + "/roadmaps/samples_Right_torso.txt";
     std::string right_torso_connections_file = package_path + "/roadmaps/connections_Right_torso.txt";
-    std::string right_samples_file = package_path + "/roadmaps/samples_Right.txt";
-    std::string right_connections_file = package_path + "/roadmaps/connections_Right.txt";
-    // Graph_t left_g(left_samples_file, left_connections_file);
-    // Graph_t right_g(right_samples_file, right_connections_file);
-    Planner_t planner(right_torso_samples_file, right_torso_connections_file, right_samples_file, right_connections_file);
+    Planner_t planner(right_torso_samples_file, right_torso_connections_file);
 
     // planner.printWrapper();
     std::cout << "time to load graph with " << planner.m_right_torso_g.getnNodes() << " nodes is " << t.elapsed() << "\n";
-    std::cout << "time to load graph with " << planner.m_right_g.getnNodes() << " nodes is " << t.elapsed() << "\n";
 
     // claim service the node provide (server)
     ros::ServiceServer server = nh.advertiseService("astar_path_finding", &Planner_t::astarSolverCallback, &planner);

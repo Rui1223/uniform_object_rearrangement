@@ -16,6 +16,7 @@ from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderP
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectRequest
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
+from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
 ############################### description ################################
 ### This class defines a RearrangementTaskPlanner class which
@@ -105,6 +106,29 @@ class RearrangementTaskPlanner(object):
             return executeTraj_response.success
         except rospy.ServiceException as e:
             print(" execute_trajectory service call failed: %s" % e)
+
+    def serviceCall_attach_object(self, attach, object_idx, armType):
+        """call the AttachObject service to attach/detach the corresponding object
+        inputs
+        ======
+            attach (bool): indicate the action of attach or detach
+            object_idx (int): the object to attach or detach
+            armType (string): "Left"/"Right"/"Left_torso"/"Right_torso"
+        outputs
+        =======
+            success: indicator of whether the attach/detach command is fulfilled
+        """
+        rospy.wait_for_service("attach_object")
+        request = AttachObjectRequest()
+        request.attach = attach
+        request.object_idx = object_idx
+        request.armType = armType
+        try:
+            attachObject_proxy = rospy.ServiceProxy("attach_object", AttachObject)
+            attachObject_response = attachObject_proxy(request.attach, request.object_idx, request.armType)
+            return attachObject_response.success
+        except rospy.ServiceException as e:
+            print(" attach_object service call failed: %s" % e)
         
 
     def executeWholePlan(self, whole_path):
@@ -119,10 +143,17 @@ class RearrangementTaskPlanner(object):
         """
         for path in whole_path:
             ### first execute the transit trajectory in the path
-            self.serviceCall_execute_trajectory(path.transit_trajectory)
+            execute_success = self.serviceCall_execute_trajectory(path.transit_trajectory)
             ### now attach the object
-            
-
+            attach_success = self.serviceCall_attach_object(
+                attach=True, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
+            ### then execute the transfer trajectory in the path
+            execute_success = self.serviceCall_execute_trajectory(path.transfer_trajectory)
+            ### now detach the object
+            attach_success = self.serviceCall_attach_object(
+                attach=False, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
+            ### finally execute the finish trajectory in the path
+            execute_success = self.serviceCall_execute_trajectory(path.finish_trajectory)
         
 
     def rosInit(self):
@@ -165,28 +196,37 @@ def main(args):
     cylinder_objects = rearrangement_task_planner.serviceCall_cylinderPositionEstimate()
     reproduce_instance_success = rearrangement_task_planner.serviceCall_reproduceInstanceCylinder(cylinder_objects)
 
-    # object_ordering = input('give me an object ordering')
-    # object_ordering = str(object_ordering)
-    # object_ordering = object_ordering.split(",")
-    # object_ordering = [int(i) for i in object_ordering]
-    # print(object_ordering)
+    object_ordering = input('give me an object ordering')
+    object_ordering = str(object_ordering)
+    object_ordering = object_ordering.split(",")
+    object_ordering = [int(i) for i in object_ordering]
+    print(object_ordering)
     # object_ordering = [2, 1, 0]
-    object_ordering = [2]
+    # object_ordering = [2]
     whole_path = []
+    TASK_SUCCESS = True
     # obj_idx = 2
+    start_time = time.time()
     for obj_idx in object_ordering:
         rearrange_success, object_path = rearrangement_task_planner.serviceCall_rearrangeCylinderObject(obj_idx, "Right_torso")
         if not rearrange_success:
             print("oh ow, you failed at object: {}".format(obj_idx))
+            TASK_SUCCESS = False
             break
         ### otherwise get the path
         whole_path.append(object_path)
+    end_time = time.time()
+    print("Time for planning is: {}".format(end_time - start_time))
 
-    execute_success = rearrangement_task_planner.executeWholePlan(whole_path)
-    if execute_success: 
-        rospy.logwarn("THE REARRANGEMENT TASK IS FULFILLED BY THE ROBOT")
-    else:
-        rospy.logwarn("THE REARRANGEMENT TASK IS NOT FULFILLED BY THE ROBOT")
+    if TASK_SUCCESS:
+        start_time = time.time()
+        execute_success = rearrangement_task_planner.executeWholePlan(whole_path)
+        if execute_success: 
+            rospy.logwarn("THE REARRANGEMENT TASK IS FULFILLED BY THE ROBOT")
+        else:
+            rospy.logwarn("THE REARRANGEMENT TASK IS NOT FULFILLED BY THE ROBOT")
+        end_time = time.time()
+        print("Time for executing is: {}".format(end_time - start_time))
 
 
     while not rospy.is_shutdown():

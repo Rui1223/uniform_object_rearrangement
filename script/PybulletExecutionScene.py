@@ -24,6 +24,7 @@ from sensor_msgs.msg import Image
 from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderResponse
 from uniform_object_rearrangement.srv import CylinderPoseEstimate, CylinderPoseEstimateResponse
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryResponse
+from uniform_object_rearrangement.srv import AttachObject, AttachObjectResponse
 
 ############################### description ###############################
 ### This class defines a PybulletExecutionScene class which
@@ -116,6 +117,8 @@ class PybulletExecutionScene(object):
             "cylinder_pose_estimate", CylinderPoseEstimate, self.cylinder_pose_estimate_callback)
         self.execute_trajectory_server = rospy.Service(
             "execute_trajectory", ExecuteTrajectory, self.execute_traj_callback)
+        self.attach_object_server = rospy.Service(
+                "attach_object", AttachObject, self.attach_object_callback)
         rospy.init_node("pybullet_execution_scene", anonymous=True)
 
     
@@ -132,10 +135,10 @@ class PybulletExecutionScene(object):
         ### given the request data: num_objects (int32)
         rospy.logwarn("GENERATE REARRANGEMENT INSTANCE")
         self.num_objects = req.num_objects
-        # success = self.workspace_e.generateInstance_fix(
-        #         self.cylinder_radius, self.cylinder_height, self.num_objects)
         success = self.workspace_e.generateInstance_fix(
                 self.cylinder_radius, self.cylinder_height, self.num_objects)
+        # success = self.workspace_e.generateInstance_cylinders(
+        #         self.cylinder_radius, self.cylinder_height, self.num_objects)
         if success == True:
             print("successfully generate an instance")
         else:
@@ -148,6 +151,17 @@ class PybulletExecutionScene(object):
         self.executor_e.executeTrajectory(
             req.arm_trajectory.trajectory, self.robot_e, req.arm_trajectory.armType)
         return ExecuteTrajectoryResponse(True)
+
+    def attach_object_callback(self, req):
+        ### given the request data: attach (bool) + armType (string)
+        if req.attach:
+            self.executor_e.attachObject(req.object_idx, self.workspace_e, self.robot_e, req.armType)
+            print("successfully attached the object")
+            return AttachObjectResponse(True)
+        else:
+            self.executor_e.detachObject(self.workspace_e, self.robot_e, req.armType)
+            print("successfully detached the object")
+            return AttachObjectResponse(True)
 
 
     def readROSParam(self):

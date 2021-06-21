@@ -122,14 +122,14 @@ class PybulletPlanScene(object):
 
     def provide_pose_for_object(self, object_idx, manipulation_type):
         if manipulation_type == "picking":
-            targetPose = [[self.workspace_p.object_geometries[object_idx].start_pos[0] - 0.02,
+            targetPose = [[self.workspace_p.object_geometries[object_idx].start_pos[0] - self.cylinder_radius/2 - 0.0025,
                         self.workspace_p.object_geometries[object_idx].start_pos[1],
-                        self.workspace_p.object_geometries[object_idx].start_pos[2]], 
+                        self.workspace_p.object_geometries[object_idx].start_pos[2] + self.cylinder_height/2 - 0.03], 
                         [0.707, 0, 0.707, 0]]
         if manipulation_type == "placing":
-            targetPose = [[self.workspace_p.object_geometries[object_idx].goal_pos[0] - 0.02,
+            targetPose = [[self.workspace_p.object_geometries[object_idx].goal_pos[0] - self.cylinder_radius/2 - 0.0025,
                         self.workspace_p.object_geometries[object_idx].goal_pos[1],
-                        self.workspace_p.object_geometries[object_idx].goal_pos[2]], 
+                        self.workspace_p.object_geometries[object_idx].goal_pos[2] + self.cylinder_height/2 - 0.03], 
                         [0.707, 0, 0.707, 0]]
         return targetPose
 
@@ -156,9 +156,6 @@ class PybulletPlanScene(object):
         if armType == "Left" or armType == "Right":
             jointNames = motomanRJointNames[first_joint_index:first_joint_index+7]
 
-        print(type(motomanRJointNames[0]))
-        print(type(jointNames[0]))
-        print("=============================")
         for config in traj:
             joint_state = JointState()
             joint_state.name = jointNames

@@ -31,8 +31,8 @@ def main(args):
         nsamples, pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p)
     pybullet_plan_scene.planner_p.samplesConnect(
         pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "Right_torso")
-    pybullet_plan_scene.planner_p.samplesConnect(
-        pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "Right")
+    # pybullet_plan_scene.planner_p.samplesConnect(
+    #     pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "Right")
 
     time.sleep(10000)
 
