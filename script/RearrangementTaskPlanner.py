@@ -154,6 +154,8 @@ class RearrangementTaskPlanner(object):
                 attach=False, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
             ### finally execute the finish trajectory in the path
             execute_success = self.serviceCall_execute_trajectory(path.finish_trajectory)
+
+        return execute_success
         
 
     def rosInit(self):
@@ -196,12 +198,12 @@ def main(args):
     cylinder_objects = rearrangement_task_planner.serviceCall_cylinderPositionEstimate()
     reproduce_instance_success = rearrangement_task_planner.serviceCall_reproduceInstanceCylinder(cylinder_objects)
 
-    object_ordering = input('give me an object ordering')
-    object_ordering = str(object_ordering)
-    object_ordering = object_ordering.split(",")
-    object_ordering = [int(i) for i in object_ordering]
-    print(object_ordering)
-    # object_ordering = [2, 1, 0]
+    # object_ordering = input('give me an object ordering')
+    # object_ordering = str(object_ordering)
+    # object_ordering = object_ordering.split(",")
+    # object_ordering = [int(i) for i in object_ordering]
+    # print(object_ordering)
+    object_ordering = [2, 1, 0]
     # object_ordering = [2]
     whole_path = []
     TASK_SUCCESS = True
