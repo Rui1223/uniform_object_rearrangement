@@ -51,8 +51,8 @@ class PybulletPlanScene(object):
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
 	
         ### set the server for the pybullet plan scene
-        self.planningClientID = p.connect(p.DIRECT)
-        # self.planningClientID = p.connect(p.GUI)
+        # self.planningClientID = p.connect(p.DIRECT)
+        self.planningClientID = p.connect(p.GUI)
         # p.setAdditionalSearchPath(pybullet_data.getDataPath())
         # self.egl_plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
         # print("plugin=", self.egl_plugin)
@@ -176,121 +176,153 @@ class PybulletPlanScene(object):
 
         ########################## generate picking pose + pre-picking pose ###################################
         currConfig = self.getCurrentConfig(req.armType)
+        start_time = time.time()
         pickingPose = self.provide_pose_for_object(req.object_idx, "picking")
+        # print("time for obtaining a picking pose for an object: {}".format(time.time()-start_time))
+
+        start_time = time.time()
         isPoseValid, configToPickingPose = self.planner_p.generateConfigBasedOnPose(
-                    pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
+                    pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+        # print("time for generating an IK for the picking pose: {}".format(time.time()-start_time))
         if not isPoseValid:
-            print("this pose is not even valid, let alone generating pre-picking")
+            # print("this pose is not even valid, let alone generating pre-picking")
             return RearrangeCylinderObjectResponse(isPoseValid, object_path)
         else:
-            print("the picking pose is valid, generate pre-picking")
+            # print("the picking pose is valid, generate pre-picking")
+            start_time = time.time()
             isPoseValid, prePickingPose, configToPrePickingPose = \
                 self.planner_p.generatePrePickingOrPostPlacingPose(
-                    pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
+                    pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+            # print("time for generating an IK for the pre-picking pose: {}".format(time.time()-start_time))
             if not isPoseValid:
-                print("the pre-picking pose is not valid, thus the picking pose is deemed as invalid as well")
+                # print("the pre-picking pose is not valid, thus the picking pose is deemed as invalid as well")
                 return RearrangeCylinderObjectResponse(isPoseValid, object_path)
-        print("both picking pose and pre-picking pose are legitimate. Proceed to planning.")
+        # print("both picking pose and pre-picking pose are legitimate. Proceed to planning.")
         #######################################################################################################
 
         ########################## plan the path to pre-picking configuration #################################
+        start_time = time.time()
         prePicking_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePickingPose, req.object_idx, 
-                                            self.robot_p, self.workspace_p, req.armType, "transit")
+                                            self.robot_p, self.workspace_p, req.armType)
+        # print("time for motion planning and trajectory-generating a path to pre-picking config: {}".format(time.time()-start_time))
         ### the planning has been finished, either success or failure
         if prePicking_traj != []:
-            print("the transit (pre-picking) path for %s arm is successfully found" % req.armType)
+            # print("the transit (pre-picking) path for %s arm is successfully found" % req.armType)
             transit_traj += prePicking_traj
         else:
-            print("the transit (pre-picking) path for %s arm is not successfully found" % req.armType)
+            # print("the transit (pre-picking) path for %s arm is not successfully found" % req.armType)
             return RearrangeCylinderObjectResponse(False, object_path)
         #######################################################################################################
 
         ##################### cartesian path from pre-picking to picking configuration ########################
+        start_time = time.time()
         currConfig = self.getCurrentConfig(req.armType)
         ### you are reaching here since pre-picking has been reached, now get the path from pre-picking to picking
         prePickToPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
                     currConfig, configToPickingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
         transit_traj += prePickToPickTraj
+        # print("time for generating a trajectory from pre-picking to picking path: {}".format(time.time()-start_time))
         #######################################################################################################
 
         ######################################### attach the object ###########################################
         ### Now we need to attach the object in hand before transferring the object
+        start_time = time.time()
         self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
+        # print("time for call attachObject function in planner_p: {}".format(time.time()-start_time))
         #######################################################################################################
 
         ############# generate post-picking pose + cartesian move from picking to post-picking ################
         ### current the post-picking does not undergo the validity check (assume post-picking always work)
+        start_time = time.time()
         postPickingPose = copy.deepcopy(pickingPose)
         postPickingPose[0][2] += 0.05
         isPoseValid, configToPostPickingPose = self.planner_p.generateConfigBasedOnPose(
-                    postPickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
+                    postPickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+        # print("time for generating an IK for post-picking pose: {}".format(time.time()-start_time))
+        start_time = time.time()
         currConfig = self.getCurrentConfig(req.armType)
         pickToPostPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
                 currConfig, configToPostPickingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
         transfer_traj += pickToPostPickTraj
+        # print("time for generating a trajectory from picking to post-picking path: {}".format(time.time()-start_time))
         ########################################################################################################
         
         ########################## generate placing pose + pre-placing pose ####################################
+        start_time = time.time()
         currConfig = self.getCurrentConfig(req.armType)
         placingPose = self.provide_pose_for_object(req.object_idx, "placing")
         isPoseValid, configToPlacingPose = self.planner_p.generateConfigBasedOnPose(
-                    placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
+                    placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+        # print("time for generating an IK for the placing pose: {}".format(time.time()-start_time))
         if not isPoseValid:
-            print("this pose is not even valid, let alone generating pre-placing")
+            # print("this pose is not even valid, let alone generating pre-placing")
             return RearrangeCylinderObjectResponse(isPoseValid, object_path)
         else:
-            print("the placing pose is valid, generate pre-placing")
+            # print("the placing pose is valid, generate pre-placing")
+            start_time = time.time()
             prePlacingPose = copy.deepcopy(placingPose)
             prePlacingPose[0][2] += 0.05
             isPoseValid, configToPrePlacingPose = self.planner_p.generateConfigBasedOnPose(
-                        prePlacingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transfer")
+                        prePlacingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+            # print("time for generating an IK for the pre-placing pose: {}".format(time.time()-start_time))
             if not isPoseValid:
-                print("the pre-placing pose is not valid, thus the placing pose is deemed as invalid as well")
+                # print("the pre-placing pose is not valid, thus the placing pose is deemed as invalid as well")
                 return RearrangeCylinderObjectResponse(isPoseValid, object_path)
-        print("both placing pose and pre-placing pose are legitimate. Proceed to planning.")
+        # print("both placing pose and pre-placing pose are legitimate. Proceed to planning.")
         #######################################################################################################
         
         ########################## plan the path to pre-placing configuration #################################
+        start_time = time.time()
         prePlacing_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePlacingPose, req.object_idx,
-                                            self.robot_p, self.workspace_p, req.armType, "transfer")
+                                            self.robot_p, self.workspace_p, req.armType)
+        # print("time for motion planning and trajectory-generating a path to pre-placing config: {}".format(time.time()-start_time))
         ### the planning has been finished, either success or failure
         if prePlacing_traj != []:
-            print("the transfer (pre-placing) path for %s arm is successfully found" % req.armType)
+            # print("the transfer (pre-placing) path for %s arm is successfully found" % req.armType)
             transfer_traj += prePlacing_traj
         else:
-            print("the transfer (pre-placing) path for %s arm is not successfully found" % req.armType)
+            # print("the transfer (pre-placing) path for %s arm is not successfully found" % req.armType)
             return RearrangeCylinderObjectResponse(False, object_path)
         #######################################################################################################
 
         ##################### cartesian path from pre-placing to placing configuration ########################
+        start_time = time.time()
         currConfig = self.getCurrentConfig(req.armType)
         ### you are reaching here since pre-placing has been reached, now get the path from pre-placing to placing
         prePlaceToPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
                     currConfig, configToPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
         transfer_traj += prePlaceToPlaceTraj
+        # print("time for generating a trajectory from pre-placing to placing: {}".format(time.time()-start_time))
         #######################################################################################################
 
         ######################################### detach the object ###########################################
         ### Now we need to detach the object in hand before retracting the object (post-placing)
+        start_time = time.time()
         self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
+        # print("time for call detachObject function in planner_p: {}".format(time.time()-start_time))
         #######################################################################################################
 
         ############# generate post-placing pose + cartesian move from placing to post-placing ################
         ### retract the arm from the object
+        start_time = time.time()
         currConfig = self.getCurrentConfig(req.armType)
         isPoseValid, postPlacingPose, configToPostPlacingPose = self.planner_p.generatePrePickingOrPostPlacingPose(
-                    placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType, "transit")
+                    placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+        # print("time for generating an IK for the post-placing pose: {}".format(time.time()-start_time))
         if not isPoseValid:
-            print("The post-placing pose is not valid")
+            # print("The post-placing pose is not valid")
             return RearrangeCylinderObjectResponse(isPoseValid, object_path)
-        print("post-placing is legitimate. Cartesian move please")
+        # print("post-placing is legitimate. Cartesian move please")
         ### we need to check if a transition from targetPose to post-placement pose will work
+        start_time = time.time()
         placeToPostPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
                 currConfig, configToPostPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
         finish_traj += placeToPostPlaceTraj
+        # print("time for generating a trajectory from placing to post-placing: {}".format(time.time()-start_time))
         ########################################################################################################
         
         ################################# prepare the path for the object ######################################
+        start_time = time.time()
         ### get the current state
         currConfig = self.getCurrentConfig(req.armType)
         ### congrat! No problem of rearranging the current object
@@ -302,6 +334,7 @@ class PybulletPlanScene(object):
         object_path.finish_trajectory = self.generateArmTrajectory(
                                             finish_traj, req.armType, self.robot_p.motomanRJointNames)
         object_path.object_idx = req.object_idx
+        # print("time for generating the final ArmTrajectory for all objects: {}".format(time.time()-start_time))
         return RearrangeCylinderObjectResponse(True, object_path)
         ########################################################################################################
 
