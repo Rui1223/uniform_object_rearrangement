@@ -96,10 +96,12 @@ class CollisionChecker(object):
                     if (contact[3] == 10 and (armType == "Left" or armType == "Left_torso")) or \
                             (contact[3] == 20 and (armType == "Right" or armType == "Right_torso")):
                         ### we allow the object to be slightly contact with the end effector
+                        # print("we allow the object to be slightly contact with the end effector")
                         pass
                     elif (contact[3] == 9 and (armType == "Left" or armType == "Left_torso") and contact[8] >= 0) or \
                             (contact[3] == 19 and (armType == "Right" or armType == "Right_torso") and contact[8] >= 0):
                         ### we allow the object to be slightly contact with the hand
+                        # print("we allow the object to be slightly contact with the hand")
                         pass
                     else:
                         isCollision = True

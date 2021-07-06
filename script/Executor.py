@@ -120,6 +120,4 @@ class Executor(object):
             if (self.isObjectInLeftHand and (armType == "left" or armType == "Left_torso") or \
                 self.isObjectInRightHand and (armType == "Right" or armType == "Right_torso")):
                 self.updateRealObjectBasedonLocalPose(robot, armType)
-            time.sleep(0.05) ### you can tune the time here to make it more real-time control
-
-    
+            time.sleep(0.02) ### you can tune the time here to make it more real-time control

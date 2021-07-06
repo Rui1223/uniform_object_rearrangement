@@ -18,19 +18,23 @@
 	<group ns="workspace_table">
 		<!-- specification of the workspace (table scene) -->
 		<rosparam param="standingBase_dim">[0.915, 0.62, 0.19]</rosparam>
-		<!-- <rosparam param="table_dim">[1.062, 1.515, 1.13]</rosparam> -->
-		<rosparam param="table_dim">[0.762, 1.215, 0.8]</rosparam>
-		<!-- the following parameter specifies how the far the table (inner edge) is from the robot rigid body in x direction -->
-		<rosparam param="table_offset_x">0.55</rosparam>
+		<rosparam param="table_dim">[0.52, 1.225, 0.95]</rosparam>
+		<!-- <rosparam param="table_dim">[0.48, 1.225, 0.95]</rosparam> -->
+		<!-- <rosparam param="table_dim">[0.762, 1.215, 0.8]</rosparam> -->
+		<!-- the following parameter specifies how far the table (inner edge) is from the robot rigid body in x direction -->
+		<!-- <rosparam param="table_offset_x">0.585</rosparam> -->
+		<rosparam param="table_offset_x">0.60</rosparam>
 		<!-- the following parameter specifies the height up to which the left arm transfer the object (either drop or trigger handoff) -->
 <!-- 		<rosparam param="transitCenterHeight">0.8</rosparam> -->
 	</group>
 
 	<group ns="constrained_area">
 		<!-- specification of the constrained area where the objects are situated -->
-		<rosparam param="constrained_area_dim">[0.50, 0.80, 0.80]</rosparam>
+		<!-- now the constrained area (planner): [0.48-0.005=0.475, 1.225-0.005*2=1.215] -->
+		<!-- <rosparam param="constrained_area_dim">[0.50, 0.80, 0.80]</rosparam> -->
+		<!-- <rosparam param="constrained_area_dim">[0.50, 1.1, 0.80]</rosparam> -->
+		<rosparam param="ceiling_height">0.6</rosparam>
 		<rosparam param="thickness_flank">0.005</rosparam>
-		<rosparam param="back_distance">0.05</rosparam>
 	</group>
 
 	<group ns="simulated_camera">
@@ -44,6 +48,12 @@
 		<!-- specification of the dimension of the uniform cylinder objects-->
 		<rosparam param="radius">0.035</rosparam>
 		<rosparam param="height">0.25</rosparam>
+	</group>
+
+	<group ns="object_goal_deployment">
+		<!-- specification of deploying object goal positions -->
+		<rosparam param="object_interval">0.07</rosparam>
+		<rosparam param="glass_clearance">0.07</rosparam>
 	</group>
 
 	<group ns="object_mesh_to_drop_in_real_scene">

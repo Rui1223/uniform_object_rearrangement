@@ -100,3 +100,35 @@ def interpolateQuaternion(Q1, Q2, f):
     Q = [x / Q_norm, y / Q_norm, z / Q_norm, w / Q_norm]
 
     return Q
+
+def getQuaternionFromRotationMatrix(rot):
+    """ This function calculates quaternion (1*4)
+        given a rotation matrix (3*3)
+        
+        inputs
+        ======
+            rot(3*3 numpy array): rotation matrix
+        output
+        ======
+            quat(1*4 list): quaternion (x,y,z,w)
+        source:
+        https://d3cw3dd2w32x2b.cloudfront.net/wp-content/uploads/2015/01/matrix-to-quat.pdf
+    """
+    if rot[2][2] < 0:
+        if (rot[0][0] > rot[1][1]):
+            t = 1 + rot[0][0] - rot[1][1] - rot[2][2]
+            quat = [t, rot[0][1]+rot[1][0], rot[2][0]+rot[0][2], rot[1][2]-rot[2][1]]
+        else:
+            t = 1 - rot[0][0] + rot[1][1] - rot[2][2]
+            quat = [rot[0][1]+rot[1][0], t, rot[1][2]+rot[2][1], rot[2][0]-rot[0][2]]
+    else:
+        if (rot[0][0] < -rot[1][1]):
+            t = 1 - rot[0][0] - rot[1][1] + rot[2][2]
+            quat = [rot[2][0]+rot[0][2], rot[1][2]+rot[2][1], t, rot[0][1]-rot[1][0]]
+        else:
+            t = 1 + rot[0][0] + rot[1][1] + rot[2][2]
+            quat = [rot[1][2]-rot[2][1], rot[2][0]-rot[0][2], rot[0][1]-rot[1][0], t]
+    quat = [e*0.5/math.sqrt(t) for e in quat]
+
+    return quat
+

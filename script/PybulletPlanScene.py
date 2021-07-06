@@ -19,6 +19,7 @@ from sensor_msgs.msg import JointState
 from MotomanRobot import MotomanRobot
 from WorkspaceTable import WorkspaceTable
 from Planner import Planner
+import utils
 
 from uniform_object_rearrangement.msg import ArmTrajectory
 from uniform_object_rearrangement.msg import ObjectRearrangePath
@@ -43,7 +44,7 @@ class PybulletPlanScene(object):
         leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, \
         standingBase_dim, table_dim, table_offset_x, \
         self.cylinder_radius, self.cylinder_height, \
-        constrained_area_dim, thickness_flank, back_distance, \
+        ceiling_height, thickness_flank, \
         object_mesh_path = self.readROSParam()
         
         ### set the rospkg path
@@ -57,18 +58,18 @@ class PybulletPlanScene(object):
         # self.egl_plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
         # print("plugin=", self.egl_plugin)
 
-        ### create a planner assistant
-        self.planner_p = Planner(
-            self.rosPackagePath, self.planningClientID,
-            isObjectInLeftHand=False, isObjectInRightHand=False,
-            objectInLeftHand=None, objectInRightHand=None)
-
         ### configure the robot
         self.configureMotomanRobot(urdfFile, basePosition, baseOrientation, \
             leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, False)
         ### setup the workspace
         self.setupWorkspace(standingBase_dim, table_dim, table_offset_x, object_mesh_path, False)
-        self.workspace_p.addConstrainedArea(constrained_area_dim, thickness_flank, back_distance)
+        self.workspace_p.addConstrainedArea(ceiling_height, thickness_flank)
+
+        ### create a planner assistant
+        self.planner_p = Planner(
+            self.rosPackagePath, self.planningClientID,
+            isObjectInLeftHand=False, isObjectInRightHand=False,
+            objectInLeftHand=None, objectInRightHand=None)
 
 
     def configureMotomanRobot(self, 
@@ -89,6 +90,15 @@ class PybulletPlanScene(object):
             standingBase_dim, table_dim, table_offset_x, 
             os.path.join(self.rosPackagePath, object_mesh_path),
             isPhysicsTurnOn, self.planningClientID)
+
+    def deployAllGoalPositions(self, 
+        object_interval=0.07, side_clearance=0.07, cylinder_radius=None, cylinder_height=None):
+        ### ask workspace to deploy all goal positions ###
+        if cylinder_radius == None: cylinder_radius = self.cylinder_radius
+        if cylinder_height == None: cylinder_height = self.cylinder_height
+        self.workspace_p.deployAllGoalPositions(
+            object_interval, side_clearance, cylinder_radius, cylinder_height)
+
 
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
@@ -113,12 +123,14 @@ class PybulletPlanScene(object):
             print("fail to reproduce an instance")
         return ReproduceInstanceCylinderResponse(success)
 
+
     def getCurrentConfig(self, armType):
         if armType == "Right":
             currConfig = copy.deepcopy(self.robot_p.rightArmCurrConfiguration)
         if armType == "Right_torso":
             currConfig = copy.deepcopy([self.robot_p.torsoCurrConfiguration] + self.robot_p.rightArmCurrConfiguration)
         return currConfig
+
 
     def provide_pose_for_object(self, object_idx, manipulation_type):
         if manipulation_type == "picking":
@@ -338,6 +350,87 @@ class PybulletPlanScene(object):
         return RearrangeCylinderObjectResponse(True, object_path)
         ########################################################################################################
 
+    def generateOrientations(self, 
+            default_orientation=np.array([[0.0, 0.0, 1.0], [0.0, -1.0, 0.0], [1.0, 0.0, 0.0]]),
+            possible_angles=[0, -15, -45, -30, 15]):
+        ###### this function generates all orientation given default and angle options ######
+        orientations = []
+        for angle in possible_angles:
+            angle *= math.pi / 180.0
+            rotation = np.array([[math.cos(angle), -math.sin(angle), 0], 
+                                 [math.sin(angle), math.cos(angle), 0], 
+                                 [0, 0, 1]])
+            orientation = np.dot(default_orientation, rotation)
+            temp_quat = utils.getQuaternionFromRotationMatrix(orientation)
+            # print("quaternion: ", temp_quat)
+            orientations.append(temp_quat)
+        
+        return orientations
+
+    
+    def calculateReachabilityMap(self, orientation, placeholder_shape="cylinder"):
+        ### calculate the reachability map for a particular orientation
+        ### mark with the shape of different color specified
+        ### Input: orientation is a format of quaternion (x,y,z,w)
+        ### set up the two dictionaries as the mapping
+        flag_color = {
+            0: [0,1,0,1],
+            1: [1,0,0,1],
+            2: [0,0,1,1],
+            3: [1,1,0,1]
+        }
+        obj_idx = 0
+        for object_pos in self.workspace_p.all_goal_positions.values():
+            print("current obj_idx: {}".format(obj_idx))
+            temp_pos = copy.deepcopy(object_pos)
+            temp_pos[2] = object_pos[2] + self.cylinder_height/2 - 0.03
+            target_pose = [temp_pos, orientation]
+            ### first check the pose
+            isPoseValid, FLAG, configToPose = self.planner_p.generateConfigBasedOnPose(
+                        target_pose, obj_idx, self.robot_p, self.workspace_p, "Right_torso")
+            if not isPoseValid:
+                print("the pose is not valid")
+                if placeholder_shape == "cylinder":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                        radius=self.cylinder_radius, length=self.cylinder_height, 
+                        rgbaColor=flag_color[FLAG], physicsClientId=self.planningClientID)
+                if placeholder_shape == "sphere":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_SPHERE,
+                        radius=0.005, rgbaColor=flag_color[FLAG], physicsClientId=self.planningClientID)
+                temp_placeholderM = p.createMultiBody(
+                    baseVisualShapeIndex=temp_placeholder_v, basePosition=object_pos, physicsClientId=self.planningClientID)
+            else:
+                ### then check the pre-grasp pose
+                isPoseValid, FLAG, prePickingPose, configToPrePickingPose = \
+                    self.planner_p.generatePrePickingOrPostPlacingPose(
+                        target_pose, obj_idx, self.robot_p, self.workspace_p, "Right_torso")
+                if not isPoseValid:
+                    print("the pre-picking pose is not valid")
+                    if placeholder_shape == "cylinder":
+                        temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                            radius=self.cylinder_radius, length=self.cylinder_height, 
+                            rgbaColor=flag_color[FLAG], physicsClientId=self.planningClientID)
+                    if placeholder_shape == "sphere":
+                        temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_SPHERE,
+                            radius=0.005, rgbaColor=flag_color[FLAG], physicsClientId=self.planningClientID)
+                    temp_placeholderM = p.createMultiBody(
+                        baseVisualShapeIndex=temp_placeholder_v, basePosition=object_pos, physicsClientId=self.planningClientID)
+            if isPoseValid:
+                print("both picking and pre-picking poses are valid")
+                if placeholder_shape == "cylinder":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                        radius=self.cylinder_radius, length=self.cylinder_height, 
+                        rgbaColor=flag_color[FLAG], physicsClientId=self.planningClientID)
+                if placeholder_shape == "sphere":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_SPHERE,
+                        radius=0.005, rgbaColor=flag_color[FLAG], physicsClientId=self.planningClientID)
+                temp_placeholderM = p.createMultiBody(
+                    baseVisualShapeIndex=temp_placeholder_v, basePosition=object_pos, physicsClientId=self.planningClientID)
+            print("finish the object {}".format(obj_idx))
+        ### out of the loop
+        self.robot_p.resetArmConfig_torso(
+            self.robot_p.leftArmHomeConfiguration+self.robot_p.rightArmHomeConfiguration, self.robot_p.torsoHomeConfiguration)
+        time.sleep(10000)
 
 
     def readROSParam(self):
@@ -386,17 +479,13 @@ class PybulletPlanScene(object):
             rospy.sleep(0.2)
         cylinder_height = rospy.get_param('/uniform_cylinder_object/height')
 
-        while not rospy.has_param('/constrained_area/constrained_area_dim'):
+        while not rospy.has_param('/constrained_area/ceiling_height'):
             rospy.sleep(0.2)
-        constrained_area_dim = rospy.get_param('/constrained_area/constrained_area_dim')
+        ceiling_height = rospy.get_param('/constrained_area/ceiling_height')
 
         while not rospy.has_param('/constrained_area/thickness_flank'):
             rospy.sleep(0.2)
         thickness_flank = rospy.get_param('/constrained_area/thickness_flank')
-
-        while not rospy.has_param('/constrained_area/back_distance'):
-            rospy.sleep(0.2)
-        back_distance = rospy.get_param('/constrained_area/back_distance')
 
         while not rospy.has_param('/object_mesh_to_drop_in_real_scene/object_mesh_path'):
             rospy.sleep(0.2)
@@ -406,7 +495,7 @@ class PybulletPlanScene(object):
             leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, \
             standingBase_dim, table_dim, table_offset_x, \
             cylinder_radius, cylinder_height, \
-            constrained_area_dim, thickness_flank, back_distance, \
+            ceiling_height, thickness_flank, \
             object_mesh_path
 
 

@@ -32,9 +32,6 @@ from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 class RearrangementTaskPlanner(object):
 
     def __init__(self, args):
-        ### read in relevant ros parameters for rearrangement planner
-        table_dim, table_offset_x, cylinder_radius, \
-        constrained_area_dim, back_distance = self.readROSParam()
         ### set the rospkg path
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
@@ -162,31 +159,6 @@ class RearrangementTaskPlanner(object):
         ### This function specifies the role of a node instance for this class ###
         ### and initializes a ros node
         rospy.init_node("rearrangement_task_planner", anonymous=True)
-
-    def readROSParam(self):
-        ### This functions read in needed ROS parameters
-        while not rospy.has_param('/workspace_table/table_dim'):
-            rospy.sleep(0.2)
-        table_dim = rospy.get_param('/workspace_table/table_dim')
-
-        while not rospy.has_param('/workspace_table/table_offset_x'):
-            rospy.sleep(0.2)
-        table_offset_x = rospy.get_param('/workspace_table/table_offset_x')
-
-        while not rospy.has_param('/uniform_cylinder_object/radius'):
-            rospy.sleep(0.2)
-        cylinder_radius = rospy.get_param('/uniform_cylinder_object/radius')
-
-        while not rospy.has_param('/constrained_area/constrained_area_dim'):
-            rospy.sleep(0.2)
-        constrained_area_dim = rospy.get_param('/constrained_area/constrained_area_dim')
-
-        while not rospy.has_param('/constrained_area/back_distance'):
-            rospy.sleep(0.2)
-        back_distance = rospy.get_param('/constrained_area/back_distance')
-
-        return table_dim, table_offset_x, cylinder_radius, \
-            constrained_area_dim, back_distance
 
 
 def main(args):
