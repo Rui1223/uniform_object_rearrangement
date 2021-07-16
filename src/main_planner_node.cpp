@@ -32,8 +32,8 @@ public:
 
     bool astarSolverCallback(
         uniform_object_rearrangement::AstarPathFinding::Request &req,
-        uniform_object_rearrangement::AstarPathFinding::Response &resp
-        ) {
+        uniform_object_rearrangement::AstarPathFinding::Response &resp) 
+    {
         if (req.armType == "Right_torso"){
             if (m_astar_solver.getQueryIdx() != req.query_idx) {
                 // this is a new query, let's set the new query
@@ -47,29 +47,11 @@ public:
             m_astar_solver.prepareToSearch(m_right_torso_g);
             m_astar_solver.Astar_search(m_right_torso_g);
         }
-        // if (req.armType == "Right") {
-        //     if (m_astar_solver.getQueryIdx() != req.query_idx) {
-        //         // this is a new query, let's set the new query
-        //         m_astar_solver.setPlanningQuery(m_right_g, req.query_idx, 
-        //             req.start_idx, req.goal_idx, req.start_config, req.goal_config,
-        //             req.start_neighbors_idx, req.goal_neighbors_idx,
-        //             req.start_neighbors_cost, req.goal_neighbors_cost,
-        //             req.violated_edges);
-        //     }
-        //     m_right_g.modifyEdge(req.violated_edges, req.query_idx);
-        //     m_astar_solver.prepareToSearch(m_right_g);
-        //     m_astar_solver.Astar_search(m_right_g);
-        // }
 
         // let's return the response after a search
         resp.searchSuccess = m_astar_solver.getSearchSuccessInfo();
         resp.path = m_astar_solver.getPath();
-        if (resp.searchSuccess == true) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        return true;
 
     }
 
@@ -107,62 +89,3 @@ int main(int argc, char** argv)
     return 0;
 
 }
-
-
-//////////////// below is not used but just kept for legacy ////////////////
-
-// bool astarSolverCallback(
-//     pybullet_motoman::AstarPathFinding::Request &req,
-//     pybullet_motoman::AstarPathFinding::Response &resp
-//     ) {
-
-
-//     // std::cout << "print info in c++\n";
-//     // std::cout << "query_idx: " << req.query_idx << "\n";
-//     // std::cout << "start_idx: " << req.start_idx << "\n";
-//     // std::cout << "goal_idx: " << req.goal_idx << "\n";
-//     // std::cout << "start_config: ";
-//     // for (auto const &e : req.start_config) {
-//     //     std::cout << e << " ";
-//     // }
-//     // std::cout << "\n";
-//     // std::cout << "goal_config: ";
-//     // for (auto const &e : req.goal_config) {
-//     //     std::cout << e << " ";
-//     // }
-//     // std::cout << "\n";
-//     // std::cout << "start_neighbors_idx: ";
-//     // for (auto const &e : req.start_neighbors_idx) {
-//     //     std::cout << e << " ";
-//     // }
-//     // std::cout << "\n";
-//     // std::cout << "goal_neighbors_idx: ";
-//     // for (auto const &e : req.goal_neighbors_idx) {
-//     //     std::cout << e << " ";
-//     // }
-//     // std::cout << "\n";
-//     // std::cout << "start_neighbors_cost: ";
-//     // for (auto const &e : req.start_neighbors_cost) {
-//     //     std::cout << e << " ";
-//     // }
-//     // std::cout << "\n";
-//     // std::cout << "goal_neighbors_cost: ";
-//     // for (auto const &e : req.goal_neighbors_cost) {
-//     //     std::cout << e << " ";
-//     // }
-//     // std::cout << "\n";
-//     // std::cout << "violated_edges: ";
-//     // for (auto const &e : req.violated_edges) {
-//     //     std::cout << "(" << e.idx1 << ", " << e.idx2 << ")" << "\t";
-//     // }
-//     // std::cout << "\n";
-//     // std::cout << "armType: " << req.armType << "\n";
-
-//     // resp.searchSuccess = true;
-//     // resp.path = std::vector<int>{5000, 5001, 5, 7};
-
-//     // std::cout << "***************\n";
-
-//     // return true;
-
-// // }

@@ -167,55 +167,43 @@ def main(args):
     rate = rospy.Rate(10) ### 10hz
 
     initialize_instance_success = rearrangement_task_planner.serviceCall_generateInstanceCylinder()
-    cylinder_objects = rearrangement_task_planner.serviceCall_cylinderPositionEstimate()
-    reproduce_instance_success = rearrangement_task_planner.serviceCall_reproduceInstanceCylinder(cylinder_objects)
+    if initialize_instance_success:
+        cylinder_objects = rearrangement_task_planner.serviceCall_cylinderPositionEstimate()
+        reproduce_instance_success = rearrangement_task_planner.serviceCall_reproduceInstanceCylinder(cylinder_objects)
 
-    # object_ordering = input('give me an object ordering')
-    # object_ordering = str(object_ordering)
-    # object_ordering = object_ordering.split(",")
-    # object_ordering = [int(i) for i in object_ordering]
-    # print(object_ordering)
-    object_ordering = [2, 1, 0]
-    # object_ordering = [2]
-    whole_path = []
-    TASK_SUCCESS = True
-    # obj_idx = 2
-    start_time = time.time()
-    for obj_idx in object_ordering:
-        rearrange_success, object_path = rearrangement_task_planner.serviceCall_rearrangeCylinderObject(obj_idx, "Right_torso")
-        if not rearrange_success:
-            print("oh ow, you failed at object: {}".format(obj_idx))
-            TASK_SUCCESS = False
-            break
-        ### otherwise get the path
-        whole_path.append(object_path)
-    end_time = time.time()
-    print("Time for planning is: {}".format(end_time - start_time))
-
-    if TASK_SUCCESS:
+        object_ordering = input('give me an object ordering')
+        object_ordering = str(object_ordering)
+        object_ordering = object_ordering.split(",")
+        object_ordering = [int(i) for i in object_ordering]
+        print(object_ordering)
+        # object_ordering = [2, 1, 3, 4, 0]
+        # object_ordering = [2]
+        whole_path = []
+        TASK_SUCCESS = True
+        # obj_idx = 2
         start_time = time.time()
-        execute_success = rearrangement_task_planner.executeWholePlan(whole_path)
-        if execute_success: 
-            rospy.logwarn("THE REARRANGEMENT TASK IS FULFILLED BY THE ROBOT")
-        else:
-            rospy.logwarn("THE REARRANGEMENT TASK IS NOT FULFILLED BY THE ROBOT")
-        end_time = time.time()
-        print("Time for executing is: {}".format(end_time - start_time))
+        for obj_idx in object_ordering:
+            rearrange_success, object_path = rearrangement_task_planner.serviceCall_rearrangeCylinderObject(obj_idx, "Right_torso")
+            if not rearrange_success:
+                print("oh ow, you failed at object: {}".format(obj_idx))
+                TASK_SUCCESS = False
+                break
+            ### otherwise get the path
+            whole_path.append(object_path)
+        print("Time for planning is: {}".format(time.time() - start_time))
 
+        if TASK_SUCCESS:
+            input("enter to start the execution!!!!!")
+            start_time = time.time()
+            execute_success = rearrangement_task_planner.executeWholePlan(whole_path)
+            if execute_success: 
+                rospy.logwarn("THE REARRANGEMENT TASK IS FULFILLED BY THE ROBOT")
+            else:
+                rospy.logwarn("THE REARRANGEMENT TASK IS NOT FULFILLED BY THE ROBOT")
+            print("Time for executing is: {}".format(time.time() - start_time))
 
     while not rospy.is_shutdown():
         rate.sleep()
 
 if __name__ == '__main__':
     main(sys.argv)
-
-
-
-########################## below is not used but kept for legacy ##########################
-# for cylinder_object in cylinder_objects:
-#     obj_idx = cylinder_object.obj_idx
-#     start_pos = [cylinder_object.start_position.x, cylinder_object.start_position.y, cylinder_object.start_position.z]
-#     goal_pos = [cylinder_object.goal_position.x, cylinder_object.goal_position.y, cylinder_object.goal_position.z]
-#     print(obj_idx)
-#     print(start_pos)
-#     print(goal_pos)

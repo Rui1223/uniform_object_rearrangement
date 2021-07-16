@@ -79,44 +79,51 @@ class CollisionChecker(object):
 
 
     def collisionCheck_robot_objectGEO(self, 
-                robotGEO, objectGEO, armType, isObjectInLeftHand, isObjectInRightHand):
+        robotGEO, object_geometries, object_idx, isObjectInLeftHand, isObjectInRightHand):
+        ### here object_geometries is a dictionary (key: object_index, value: objectGEO)
         # print("+++++++++++++++++++")
         # print("isObjectInLeftHand: ", isObjectInLeftHand)
         # print("isObjectInRightHand: ", isObjectInRightHand)
         isCollision = False
         ### loop through all object geometries in the workspace
-        for g in objectGEO:
-            contacts = p.getClosestPoints(bodyA=robotGEO, bodyB=g, distance=0.0, physicsClientId=self.server)
-            # contacts = p.getContactPoints(robotGEO, g, physicsClientId=self.server)
+        for obj_idx, object_geo in object_geometries.items():
+            contacts = p.getClosestPoints(bodyA=robotGEO, bodyB=object_geo, distance=0.0, physicsClientId=self.server)
+            # contacts = p.getContactPoints(robotGEO, object_geo, physicsClientId=self.server)
             if len(contacts) != 0:
                 for contact in contacts:
                     if contact[8] >= 0:
                         ### This is a fake collision (>=0: separation, <0: penetration)
                         continue
-                    if (contact[3] == 10 and (armType == "Left" or armType == "Left_torso")) or \
-                            (contact[3] == 20 and (armType == "Right" or armType == "Right_torso")):
+                    ### for all objects
+                    if contact[3] == 10 or contact[3] == 20:
                         ### we allow the object to be slightly contact with the end effector
                         # print("we allow the object to be slightly contact with the end effector")
-                        pass
-                    elif (contact[3] == 9 and (armType == "Left" or armType == "Left_torso") and contact[8] >= 0) or \
-                            (contact[3] == 19 and (armType == "Right" or armType == "Right_torso") and contact[8] >= 0):
-                        ### we allow the object to be slightly contact with the hand
-                        # print("we allow the object to be slightly contact with the hand")
-                        pass
-                    else:
-                        isCollision = True
-                        # print("******robot collides with object GEO******")
-                        # print("body-to-body collision: ")
-                        # print(str(contact[1]) + ": " + str(contact[2]))
-                        # print("link-to-link collision: ")
-                        # print(str(contact[3]) + ": " + str(contact[4]))
-                        # print("contact position on robotGEO")
-                        # print(str(contact[5]))
-                        # print("contact position on objectGEO")
-                        # print(str(contact[6]))
-                        # print("contact distance:")
-                        # print(str(contact[8]))
-                        break
+                        continue
+                    ### for the specified object
+                    if (obj_idx == object_idx):
+                        if isObjectInLeftHand == True:
+                            ### you are checking the object which is in the left hand
+                            ### in this case, ignore the collision between the left end effector and the object
+                            if (contact[3] == 9 or contact[3] == 10): continue
+                        if isObjectInRightHand == True:
+                            ### you are checking the object which is in the right hand
+                            ### in this case, ignore the collision between the right end effector and the object
+                            if (contact[3] >= 19): continue
+
+                    ### reach here since none of the tolerance case above meets
+                    isCollision = True
+                    # print("******robot collides with object " + str(obj_idx) + "******")
+                    # print("body-to-body collision: ")
+                    # print(str(contact[1]) + ": " + str(contact[2]))
+                    # print("link-to-link collision: ")
+                    # print(str(contact[3]) + ": " + str(contact[4]))
+                    # print("contact position on robotGEO")
+                    # print(str(contact[5]))
+                    # print("contact position on objectGEO")
+                    # print(str(contact[6]))
+                    # print("contact distance:")
+                    # print(str(contact[8]))
+                    break
         return isCollision
 
 
@@ -146,16 +153,16 @@ class CollisionChecker(object):
         return isCollision
 
     
-    def collisionCheck_object_objectGEO(self, objectGEO, objectGEOs):
+    def collisionCheck_object_objectGEO(self, objectGEO, object_geometries):
         isCollision = False
         ### loop through all object in objectGEOs
-        for object_g in objectGEOs:
+        for obj_idx, object_geo in object_geometries.items():
             contacts = p.getClosestPoints(
-                bodyA=objectGEO, bodyB=object_g, distance=0.003, physicsClientId=self.server)
+                bodyA=objectGEO, bodyB=object_geo, distance=0.003, physicsClientId=self.server)
             if len(contacts) != 0:
                 isCollision = True
                 # for contact in contacts:
-                #     print("******moving object collides with object GEO******")
+                #     print("******moving object collides with object " + str(obj_idx) + "******")
                 #     print("body-to-body collision: ")
                 #     print(str(contact[1]) + ": " + str(contact[2]))
                 #     print("link-to-link collision: ")

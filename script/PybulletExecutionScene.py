@@ -42,9 +42,12 @@ class PybulletExecutionScene(object):
         leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, \
         standingBase_dim, table_dim, table_offset_x, \
         camera_extrinsic, camera_intrinsic, \
-        self.cylinder_radius, self.cylinder_height, \
-        constrained_area_dim, thickness_flank, back_distance, \
+        cylinder_radius, cylinder_height, \
+        object_interval_x, object_interval_y, \
+        side_clearance_x, side_clearance_y, \
+        ceiling_height, thickness_flank, \
         object_mesh_path = self.readROSParam()
+
         ### set the rospkg path
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
@@ -56,24 +59,26 @@ class PybulletExecutionScene(object):
         # self.egl_plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
         # print("plugin=", self.egl_plugin)
 
-        ### create an executor assistant
-        self.executor_e = Executor(self.executingClientID,
-            isObjectInLeftHand=False, isObjectInRightHand=False,
-            objectInLeftHand=None, objectInRightHand=None)        
-
         ### configure the robot
         self.configureMotomanRobot(urdfFile, basePosition, baseOrientation, \
             leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, True)
         ### setup the workspace
         self.setupWorkspace(standingBase_dim, table_dim, table_offset_x, object_mesh_path, True)
-        self.workspace_e.addConstrainedArea(constrained_area_dim, thickness_flank, back_distance)
+        self.workspace_e.addConstrainedArea(ceiling_height, thickness_flank)
+        self.workspace_e.getObjectDeployment(cylinder_radius, cylinder_height, \
+                object_interval_x, object_interval_y, side_clearance_x, side_clearance_y)
         self.setupCamera(camera_extrinsic, camera_intrinsic)
+
+        ### create an executor assistant
+        self.executor_e = Executor(self.executingClientID,
+            isObjectInLeftHand=False, isObjectInRightHand=False,
+            objectInLeftHand=None, objectInRightHand=None)
 
 
     def configureMotomanRobot(self, 
             urdfFile, basePosition, baseOrientation,
             leftArmHomeConfiguration, rightArmHomeConfiguration, torsoHomeConfiguration, isPhysicsTurnOn):
-        ### This function configures the robot in the real scene ###
+        ### This function configures the robot in the real scene
         self.robot_e = MotomanRobot(
             os.path.join(self.rosPackagePath, urdfFile), 
             basePosition, baseOrientation, 
@@ -83,14 +88,14 @@ class PybulletExecutionScene(object):
     def setupWorkspace(self,
             standingBase_dim, table_dim, table_offset_x,
             object_mesh_path, isPhysicsTurnOn):
-        ### This function sets up the workspace ###
+        ### This function sets up the workspace
         self.workspace_e = WorkspaceTable(self.robot_e.basePosition,
             standingBase_dim, table_dim, table_offset_x, 
             os.path.join(self.rosPackagePath, object_mesh_path),
             isPhysicsTurnOn, self.executingClientID)
 
     def setupCamera(self, camera_extrinsic, camera_intrinsic):
-        ### This function sets up the camera ###
+        ### This function sets up the camera
         ### indicate which scene you are working on and whether you want to save images
 
         self.scene_index = "1"
@@ -135,10 +140,8 @@ class PybulletExecutionScene(object):
         ### given the request data: num_objects (int32)
         rospy.logwarn("GENERATE REARRANGEMENT INSTANCE")
         self.num_objects = req.num_objects
-        success = self.workspace_e.generateInstance_fix(
-                self.cylinder_radius, self.cylinder_height, self.num_objects)
-        # success = self.workspace_e.generateInstance_cylinders(
-        #         self.cylinder_radius, self.cylinder_height, self.num_objects)
+        # success = self.workspace_e.generateInstance_fix(self.num_objects)
+        success = self.workspace_e.generateInstance_cylinders(self.num_objects)
         if success == True:
             print("successfully generate an instance")
         else:
@@ -218,17 +221,29 @@ class PybulletExecutionScene(object):
             rospy.sleep(0.2)
         cylinder_height = rospy.get_param('/uniform_cylinder_object/height')
 
-        while not rospy.has_param('/constrained_area/constrained_area_dim'):
+        while not rospy.has_param('/object_goal_deployment/object_interval_x'):
             rospy.sleep(0.2)
-        constrained_area_dim = rospy.get_param('/constrained_area/constrained_area_dim')
+        object_interval_x = rospy.get_param('/object_goal_deployment/object_interval_x')
+
+        while not rospy.has_param('/object_goal_deployment/object_interval_y'):
+            rospy.sleep(0.2)
+        object_interval_y = rospy.get_param('/object_goal_deployment/object_interval_y')
+
+        while not rospy.has_param('/object_goal_deployment/side_clearance_x'):
+            rospy.sleep(0.2)
+        side_clearance_x = rospy.get_param('/object_goal_deployment/side_clearance_x')
+
+        while not rospy.has_param('/object_goal_deployment/side_clearance_y'):
+            rospy.sleep(0.2)
+        side_clearance_y = rospy.get_param('/object_goal_deployment/side_clearance_y')
+
+        while not rospy.has_param('/constrained_area/ceiling_height'):
+            rospy.sleep(0.2)
+        ceiling_height = rospy.get_param('/constrained_area/ceiling_height')
 
         while not rospy.has_param('/constrained_area/thickness_flank'):
             rospy.sleep(0.2)
         thickness_flank = rospy.get_param('/constrained_area/thickness_flank')
-
-        while not rospy.has_param('/constrained_area/back_distance'):
-            rospy.sleep(0.2)
-        back_distance = rospy.get_param('/constrained_area/back_distance')
 
         while not rospy.has_param('/object_mesh_to_drop_in_real_scene/object_mesh_path'):
             rospy.sleep(0.2)
@@ -239,7 +254,9 @@ class PybulletExecutionScene(object):
             standingBase_dim, table_dim, table_offset_x, \
             camera_extrinsic, camera_intrinsic, \
             cylinder_radius, cylinder_height, \
-            constrained_area_dim, thickness_flank, back_distance, \
+            object_interval_x, object_interval_y, \
+            side_clearance_x, side_clearance_y, \
+            ceiling_height, thickness_flank, \
             object_mesh_path
 
 
@@ -256,18 +273,19 @@ def main(args):
         time_stamp = rospy.get_time()
         # rospy.loginfo("time stamp for image and joint state publisher %s" % time_stamp)
 
-        rgbImg, depthImg = pybullet_execution_scene.camera_e.takeRGBImage()
-        # rgb_msg = bridge.cv2_to_imgmsg(rgbImg, 'rgb8')
-        # depth_msg = bridge.cv2_to_imgmsg((1000 * depthImg).astype(np.uint16), 'mono16')
-        # pybullet_execution_scene.color_im_pub.publish(rgb_msg)
-        # pybullet_execution_scene.depth_im_pub.publish(depth_msg)
-        if count == 0:
-            cv2.imwrite(
-                os.path.expanduser(os.path.join(pybullet_execution_scene.rosPackagePath, "sensor_images/color.png")), 
-                cv2.cvtColor(rgbImg, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(
-                os.path.expanduser(os.path.join(pybullet_execution_scene.rosPackagePath, "sensor_images/depth.png")), 
-                (1000 * depthImg).astype(np.uint16))
+        ### disable image rendering temporarily
+        # rgbImg, depthImg = pybullet_execution_scene.camera_e.takeRGBImage()
+        # # rgb_msg = bridge.cv2_to_imgmsg(rgbImg, 'rgb8')
+        # # depth_msg = bridge.cv2_to_imgmsg((1000 * depthImg).astype(np.uint16), 'mono16')
+        # # pybullet_execution_scene.color_im_pub.publish(rgb_msg)
+        # # pybullet_execution_scene.depth_im_pub.publish(depth_msg)
+        # if count == 0:
+        #     cv2.imwrite(
+        #         os.path.expanduser(os.path.join(pybullet_execution_scene.rosPackagePath, "sensor_images/color.png")), 
+        #         cv2.cvtColor(rgbImg, cv2.COLOR_RGB2BGR))
+        #     cv2.imwrite(
+        #         os.path.expanduser(os.path.join(pybullet_execution_scene.rosPackagePath, "sensor_images/depth.png")), 
+        #         (1000 * depthImg).astype(np.uint16))
             
 
         count += 1

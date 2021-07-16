@@ -175,7 +175,6 @@ class MotomanRobot(object):
         self.setRestPoses(
             resetTorsoConfiguration, resetArmConfiguration[0:7], resetArmConfiguration[7:14], self.rightHandCurrConfiguration)
 
-
     def setSingleArmToConfig(self, singleArmConfig, armType):
         ### the planning version of moveSingArm
         if armType == "Left":

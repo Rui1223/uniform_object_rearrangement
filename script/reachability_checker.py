@@ -27,18 +27,18 @@ def main(args):
 
     ######## regular resolution reachability checking ###########
     pybullet_plan_scene.deployAllGoalPositions()
+    time.sleep(10000)
     orientations = pybullet_plan_scene.generateOrientations() ### generate all possible orientations
     ### pick an orientation
-    orientation = orientations[1]
+    orientation = orientations[6]
     pybullet_plan_scene.calculateReachabilityMap(orientation)
     #############################################################
     
     # ######## high resolution reachability checking ###########
-    # pybullet_plan_scene.deployAllGoalPositions(
-    #     object_interval=0.02, side_clearance=0.02, cylinder_radius=0.005, cylinder_height=0.25)
+    # pybullet_plan_scene.deployAllGoalPositions(object_interval_x=0.02, object_interval_y=0.02)
     # orientations = pybullet_plan_scene.generateOrientations() ### generate all possible orientations
     # ### pick an orientation
-    # orientation = orientations[2]
+    # orientation = orientations[0]
     # pybullet_plan_scene.calculateReachabilityMap(orientation, "sphere")
     # ##########################################################
 

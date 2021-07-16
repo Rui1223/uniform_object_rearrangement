@@ -57,6 +57,7 @@ void AstarSolver_t::prepareToSearch(Graph_t &g)
 
     clearOpenAndCLosedList();
     m_path = std::vector<int>();
+    
     m_closed = std::vector<AstarNode_t*>();
     // std::cout << "is path empty? " << (m_path.empty()) << "\n";
     // std::cout << "is open list empty? " << (m_open.empty()) << "\n";
@@ -179,6 +180,7 @@ void AstarSolver_t::Astar_search(Graph_t &g)
     // You are reaching here since the open list is empty and the goal is not found
     std::cout << "The problem is not solvable. Search failed...\n\n";
     m_isSearchSuccess = false;
+    return;
 }
 
 void AstarSolver_t::back_track_path()
