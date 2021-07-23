@@ -15,6 +15,7 @@ import rospy
 import rospkg
 from std_msgs.msg import String
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Point
 
 from MotomanRobot import MotomanRobot
 from WorkspaceTable import WorkspaceTable
@@ -25,6 +26,11 @@ from uniform_object_rearrangement.msg import ArmTrajectory
 from uniform_object_rearrangement.msg import ObjectRearrangePath
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderResponse
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectResponse
+from uniform_object_rearrangement.srv import GetCertainObjectPose, GetCertainObjectPoseResponse
+from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotConfigResponse
+from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseResponse
+from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigResponse
+from uniform_object_rearrangement.srv import UpdateManipulationStatus, UpdateManipulationStatusResponse
 
 ################################## description #####################################
 ### This class defines a PybulletPlanScene class which
@@ -88,7 +94,7 @@ class PybulletPlanScene(object):
             standingBase_dim, table_dim, table_offset_x,
             object_mesh_path, isPhysicsTurnOn):
         ### This function sets up the workspace
-        self.workspace_p = WorkspaceTable(self.robot_p.basePosition,
+        self.workspace_p = WorkspaceTable(self.rosPackagePath, self.robot_p.basePosition,
             standingBase_dim, table_dim, table_offset_x, 
             os.path.join(self.rosPackagePath, object_mesh_path),
             isPhysicsTurnOn, self.planningClientID)
@@ -104,12 +110,32 @@ class PybulletPlanScene(object):
         self.reproduce_instance_cylinder_server = rospy.Service(
             "reproduce_instance_cylinder", ReproduceInstanceCylinder,
             self.reproduce_instance_cylinder_callback)
-        # self.rearrange_cylinder_object = rospy.Service(
+        # self.rearrange_cylinder_object_server = rospy.Service(
         #     "rearrange_cylinder_object", RearrangeCylinderObject,
         #     self.rearrange_cylinder_object_callback)
-        self.rearrange_cylinder_object = rospy.Service(
+        self.rearrange_cylinder_object_server = rospy.Service(
             "rearrange_cylinder_object", RearrangeCylinderObject,
             self.rearrange_cylinder_object_callback_multiposes)
+
+        self.get_certain_object_pose_server = rospy.Service(
+            "get_certain_object_pose", GetCertainObjectPose,
+            self.get_certain_object_pose_callback)
+
+        self.get_curr_robot_config_server = rospy.Service(
+            "get_curr_robot_config", GetCurrRobotConfig,
+            self.get_curr_robot_config_callback)
+
+        self.update_certain_object_pose_server = rospy.Service(
+            "update_certain_object_pose", UpdateCertainObjectPose,
+            self.update_certain_object_pose_callback)
+
+        self.reset_robot_curr_config_server = rospy.Service(
+            "reset_robot_curr_config", ResetRobotCurrConfig,
+            self.reset_robot_curr_config_callback)
+
+        self.update_manipulation_status_server = rospy.Service(
+            "update_manipulation_status", UpdateManipulationStatus,
+            self.update_manipulation_status_callback)
 
         rospy.init_node("pybullet_plan_scene", anonymous=True)
 
@@ -123,6 +149,42 @@ class PybulletPlanScene(object):
         else:
             print("fail to reproduce an instance")
         return ReproduceInstanceCylinderResponse(success)
+
+    def get_certain_object_pose_callback(self, req):
+        ### given the specified object index
+        temp_curr_pos = self.workspace_p.object_geometries[req.object_idx].curr_pos
+        curr_position = Point(temp_curr_pos[0], temp_curr_pos[1], temp_curr_pos[2])
+        # print("successfully get the object pose for object " + str(req.object_idx))
+        return GetCertainObjectPoseResponse(curr_position)
+
+    def get_curr_robot_config_callback(self, req):
+        ### get the current robot config
+        joint_state = JointState()
+        joint_state.position = self.robot_p.getRobotCurrConfig()
+        # print("successfully get the current robot configuration")
+        return GetCurrRobotConfigResponse(joint_state)
+
+    def update_certain_object_pose_callback(self, req):
+        ### update the geometry mesh of a certain object to the target pose
+        position = [req.target_pose.x, req.target_pose.y, req.target_pose.z]
+        self.workspace_p.updateObjectMesh(req.object_idx, position)
+        # print("successfully update certain object geometry to the target pose" + str(position))
+        return UpdateCertainObjectPoseResponse(True)
+
+    def reset_robot_curr_config_callback(self, req):
+        ### reset the robot to the specified configuration
+        joint_positions = list(req.robot_config.position)
+        self.robot_p.resetArmConfig_torso(joint_positions[1:15], joint_positions[0])
+        ### update the hand as well (I doubt it is a redundant step at this point)
+        self.robot_p.resetRightHandConfig(joint_positions[15:21])
+        # print("successfully reset the robot current configuration")
+        return ResetRobotCurrConfigResponse(True)
+
+    def update_manipulation_status_callback(self, req):
+        ### disable any relationship between the robot and any of the object
+        self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
+        # print("successfully update the manipulation status")
+        return UpdateManipulationStatusResponse(True)
 
 
     def getCurrentConfig(self, armType):
@@ -147,20 +209,10 @@ class PybulletPlanScene(object):
 
 
     def provide_pose_for_object(self, object_idx, manipulation_type):
-        # if manipulation_type == "picking":
-        #     targetPose = [[self.workspace_p.object_geometries[object_idx].start_pos[0] - self.workspace_p.cylinder_radius/2 - 0.0025,
-        #                 self.workspace_p.object_geometries[object_idx].start_pos[1],
-        #                 self.workspace_p.object_geometries[object_idx].start_pos[2] + self.workspace_p.cylinder_height/2 - 0.03], 
-        #                 [0.707, 0, 0.707, 0]]
-        # if manipulation_type == "placing":
-        #     targetPose = [[self.workspace_p.object_geometries[object_idx].goal_pos[0] - self.workspace_p.cylinder_radius/2 - 0.0025,
-        #                 self.workspace_p.object_geometries[object_idx].goal_pos[1],
-        #                 self.workspace_p.object_geometries[object_idx].goal_pos[2] + self.workspace_p.cylinder_height/2 - 0.03], 
-        #                 [0.707, 0, 0.707, 0]]
         if manipulation_type == "picking":
-            targetPose = [[self.workspace_p.object_geometries[object_idx].start_pos[0],
-                           self.workspace_p.object_geometries[object_idx].start_pos[1],
-                           self.workspace_p.object_geometries[object_idx].start_pos[2] + self.workspace_p.cylinder_height/2 - 0.03], 
+            targetPose = [[self.workspace_p.object_geometries[object_idx].curr_pos[0],
+                           self.workspace_p.object_geometries[object_idx].curr_pos[1],
+                           self.workspace_p.object_geometries[object_idx].curr_pos[2] + self.workspace_p.cylinder_height/2 - 0.03], 
                           [0.707, 0, 0.707, 0]]
         if manipulation_type == "placing":
             targetPose = [[self.workspace_p.object_geometries[object_idx].goal_pos[0],
@@ -387,7 +439,7 @@ class PybulletPlanScene(object):
         currConfig = self.getCurrentConfig(req.armType)
         ########################## generate picking pose candidates ###################################
         pickingPose_candidates = self.generate_pose_candidates(
-                                        self.workspace_p.object_geometries[req.object_idx].start_pos)
+                                        self.workspace_p.object_geometries[req.object_idx].curr_pos)
         ###############################################################################################
 
         #################### select the right picking pose until it works #############################
@@ -557,7 +609,7 @@ class PybulletPlanScene(object):
         currConfig = self.getCurrentConfig(req.armType)
         ########################## generate picking pose candidates ###################################
         pickingPose_candidates = self.generate_pose_candidates(
-                                        self.workspace_p.object_geometries[req.object_idx].start_pos)
+                                        self.workspace_p.object_geometries[req.object_idx].curr_pos)
         ###############################################################################################
 
         #################### select the right picking pose until it works #############################
@@ -565,7 +617,7 @@ class PybulletPlanScene(object):
         for pose_id, pickingPose in enumerate(pickingPose_candidates):
             ######################## check both picking and pre-picking pose ##########################
             isPoseValid, FLAG, configToPickingPose = self.planner_p.generateConfigBasedOnPose(
-                        pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+                pickingPose, currConfig, req.object_idx, self.robot_p, self.workspace_p, req.armType)
             if not isPoseValid:
                 print("This picking pose is not even valid, let alone generating pre-picking.")
                 print("Move on to next candidate.")
@@ -574,7 +626,7 @@ class PybulletPlanScene(object):
                 print("The picking pose is valid, generate pre-picking")
                 isPoseValid, FLAG, prePickingPose, configToPrePickingPose = \
                     self.planner_p.generatePrePickingOrPostPlacingPose(
-                        pickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+                        pickingPose, currConfig, req.object_idx, self.robot_p, self.workspace_p, req.armType)
                 if not isPoseValid:
                     print("The pre-picking pose is not valid, thus the picking pose is deemed as invalid as well.")
                     print("Move on to next candidate.")
@@ -614,17 +666,6 @@ class PybulletPlanScene(object):
         ### Now we need to attach the object in hand before transferring the object
         self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
         #######################################################################################################
-        ############# generate post-picking pose + cartesian move from picking to post-picking ################
-        ### current the post-picking does not undergo the validity check (assume post-picking always work)
-        currConfig = self.getCurrentConfig(req.armType)
-        postPickingPose = copy.deepcopy(pickingPose)
-        postPickingPose[0][2] += 0.05
-        isPoseValid, FLAG, configToPostPickingPose = self.planner_p.generateConfigBasedOnPose(
-                    postPickingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
-        pickToPostPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
-                currConfig, configToPostPickingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
-        transfer_traj += pickToPostPickTraj
-        ########################################################################################################
 
         currConfig = self.getCurrentConfig(req.armType)
         ########################## generate placing pose candidates ###################################
@@ -635,51 +676,31 @@ class PybulletPlanScene(object):
         #################### select the right picking pose until it works #############################
         transfer_success = False
         for pose_id, placingPose in enumerate(placingPose_candidates):
-            ####################### check both placing and pre-placing pose ###########################
+            ####################### check the placing pose ###########################
             isPoseValid, FLAG, configToPlacingPose = self.planner_p.generateConfigBasedOnPose(
-                        placingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+                placingPose, currConfig, req.object_idx, self.robot_p, self.workspace_p, req.armType)
             if not isPoseValid:
-                print("This placing pose is not even valid, let alone generating pre-placing.")
+                print("This placing pose is not valid.")
                 print("Move on to next candidate.")
                 continue
-            else:
-                print("The placing pose is valid, generate pre-placing")
-                prePlacingPose = copy.deepcopy(placingPose)
-                prePlacingPose[0][2] += 0.05
-                isPoseValid, FLAG, configToPrePlacingPose = self.planner_p.generateConfigBasedOnPose(
-                            prePlacingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
-                if not isPoseValid:
-                    print("The pre-placing pose is not valid, thus the placing pose is deemed as invalid as well.")
-                    print("Move on to next candidate.")
-                    continue
-                print("Both placing pose and pre-placing pose are legitimate. Proceed to planning for pre-placing.")
-            ###########################################################################################
         
-            ################### plan the path to pre-placing configuration ############################
-            prePlacing_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePlacingPose, req.object_idx,
+            ################### plan the path to placing configuration ###################
+            placing_traj = self.planner_p.AstarPathFinding(currConfig, configToPlacingPose, req.object_idx,
                                                 self.robot_p, self.workspace_p, req.armType)
             ### the planning has been finished, either success or failure
-            if prePlacing_traj != []:
-                print("The transfer (pre-placing) path for %s arm is successfully found" % req.armType)
-                transfer_traj += prePlacing_traj
-                ################## cartesian path from pre-placing to placing configuration ####################
-                currConfig = self.getCurrentConfig(req.armType)
-                ### you are reaching here since pre-placing has been reached, 
-                ### now get the path from pre-placing to placing
-                prePlaceToPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
-                    currConfig, configToPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
-                transfer_traj += prePlaceToPlaceTraj
-                #################################################################################################
+            if placing_traj != []:
+                print("The transfer placing path for %s arm is successfully found" % req.armType)
+                transfer_traj += placing_traj
                 transfer_success = True
                 break
             else:
-                print("The transfer (pre-placing) path for %s arm is not successfully found" % req.armType)
+                print("The transfer placing path for %s arm is not successfully found" % req.armType)
                 print("Move on to next candidate")
                 continue
             ############################################################################################
         
         if not transfer_success:
-            print("No placing pose is qualified, either failed (1) placing pose (2) pre-placing pose (3) planning to pre-placing")
+            print("No placing pose is qualified, either failed (1) placing pose (2) planning to placing")
             return RearrangeCylinderObjectResponse(False, object_path)
 
         ### Otherwise, congrats! Transfer is successful!
@@ -693,7 +714,7 @@ class PybulletPlanScene(object):
         postPlacingPose = copy.deepcopy(placingPose)
         postPlacingPose[0][2] += 0.05
         isPoseValid, FLAG, configToPostPlacingPose = self.planner_p.generateConfigBasedOnPose(
-                    postPlacingPose, req.object_idx, self.robot_p, self.workspace_p, req.armType)
+            postPlacingPose, currConfig, req.object_idx, self.robot_p, self.workspace_p, req.armType)
         placeToPostPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
                 currConfig, configToPostPlacingPose, self.robot_p, req.armType, req.object_idx, self.workspace_p)
         finish_traj += placeToPostPlaceTraj
@@ -750,7 +771,7 @@ class PybulletPlanScene(object):
             temp_pos[2] = object_pos[2] + self.workspace_p.cylinder_height/2 - 0.03
             target_pose = [temp_pos, orientation]
             ### first check the pose
-            isPoseValid, FLAG, configToPose = self.planner_p.generateConfigBasedOnPose(
+            isPoseValid, FLAG, configToPickingPose = self.planner_p.generateConfigBasedOnPose(
                         target_pose, obj_idx, self.robot_p, self.workspace_p, "Right_torso")
             if not isPoseValid:
                 print("the pose is not valid")
@@ -886,6 +907,7 @@ class PybulletPlanScene(object):
 def main(args):
     pybullet_plan_scene = PybulletPlanScene(args)
     pybullet_plan_scene.planner_p.loadSamples()
+
     pybullet_plan_scene.rosInit()
     rate = rospy.Rate(10) ### 10hz
 

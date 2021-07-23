@@ -89,7 +89,7 @@ class PybulletExecutionScene(object):
             standingBase_dim, table_dim, table_offset_x,
             object_mesh_path, isPhysicsTurnOn):
         ### This function sets up the workspace
-        self.workspace_e = WorkspaceTable(self.robot_e.basePosition,
+        self.workspace_e = WorkspaceTable(self.rosPackagePath, self.robot_e.basePosition,
             standingBase_dim, table_dim, table_offset_x, 
             os.path.join(self.rosPackagePath, object_mesh_path),
             isPhysicsTurnOn, self.executingClientID)
@@ -140,8 +140,8 @@ class PybulletExecutionScene(object):
         ### given the request data: num_objects (int32)
         rospy.logwarn("GENERATE REARRANGEMENT INSTANCE")
         self.num_objects = req.num_objects
-        # success = self.workspace_e.generateInstance_fix(self.num_objects)
-        success = self.workspace_e.generateInstance_cylinders(self.num_objects)
+        success = self.workspace_e.loadInstance_cylinders()
+        # success = self.workspace_e.generateInstance_cylinders(self.num_objects)
         if success == True:
             print("successfully generate an instance")
         else:

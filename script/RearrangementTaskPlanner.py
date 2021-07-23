@@ -38,7 +38,9 @@ class RearrangementTaskPlanner(object):
         self.num_objects = int(args[1])
 
     def serviceCall_generateInstanceCylinder(self):
+        print("is the node alive????????????????")
         rospy.wait_for_service("generate_instance_cylinder")
+        print("service is there!!!!")
         request = GenerateInstanceCylinderRequest()
         request.num_objects = self.num_objects
         try:
@@ -175,9 +177,9 @@ def main(args):
         object_ordering = str(object_ordering)
         object_ordering = object_ordering.split(",")
         object_ordering = [int(i) for i in object_ordering]
-        print(object_ordering)
         # object_ordering = [2, 1, 3, 4, 0]
         # object_ordering = [2]
+        print(object_ordering)
         whole_path = []
         TASK_SUCCESS = True
         # obj_idx = 2

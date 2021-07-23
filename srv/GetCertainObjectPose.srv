@@ -1,0 +1,6 @@
+# This srv file defines the service
+# get the pose of a specified object in the planning scene
+
+int32 object_idx
+---
+geometry_msgs/Point curr_position

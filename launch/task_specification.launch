@@ -53,7 +53,7 @@
 
 	<group ns="object_goal_deployment">
 		<!-- specification of deploying object goal positions -->
-		<rosparam param="object_interval_x">0.12</rosparam>
+		<rosparam param="object_interval_x">0.18</rosparam>
 		<rosparam param="object_interval_y">0.24</rosparam>
 		<rosparam param="side_clearance_x">0.05</rosparam>
 		<rosparam param="side_clearance_y">0.11</rosparam>

@@ -68,8 +68,13 @@ add_service_files(
   CylinderPositionEstimate.srv
   ExecuteTrajectory.srv
   GenerateInstanceCylinder.srv
+  GetCertainObjectPose.srv
+  GetCurrRobotConfig.srv
   RearrangeCylinderObject.srv
   ReproduceInstanceCylinder.srv
+  ResetRobotCurrConfig.srv
+  UpdateCertainObjectPose.srv
+  UpdateManipulationStatus.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -124,8 +129,9 @@ catkin_package(
 catkin_install_python(PROGRAMS
 	script/PybulletExecutionScene.py
   script/PybulletPlanScene.py
-	script/RearrangementTaskPlanner.py
   script/PoseEstimator.py
+	script/RearrangementTaskPlanner.py
+  script/MRSplanner.py
     	DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ###########

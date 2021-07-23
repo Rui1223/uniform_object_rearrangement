@@ -41,6 +41,7 @@ class Planner(object):
         self.leftLocalPose = [[-1, -1, -1], [-1, -1, -1, -1]]
         self.rightLocalPose = [[-1, -1, -1], [-1, -1, -1, -1]]
         self.query_idx = 1 ### record the current planning query index
+        self.loadIKdataset()
 
 
     def setRobotToConfig(self, ik_config, robot, armType):
@@ -53,6 +54,16 @@ class Planner(object):
         else:
             robot.setSingleArmToConfig(ik_config, armType)
 
+    def loadIKdataset(self):
+        armType = "Right_torso"
+        self.IK_dataset_Right_torso = []
+        ikdatasetFile = self.roadmapFolder + "/ik_dataset_" + str(armType) + ".txt"
+        f_ikdataset = open(ikdatasetFile, "r")
+        for line in f_ikdataset:
+            line = line.split()
+            line = [float(e) for e in line]
+            self.IK_dataset_Right_torso.append(line)
+        f_ikdataset.close()
 
     def loadSamples(self):
         arms = ["Right_torso"]
@@ -209,7 +220,7 @@ class Planner(object):
                 self.objectInLeftHand, object_global_pose[0], object_global_pose[1], 
                 physicsClientId=self.planningServer)
             ### update the position and orientation of the object manipulated (ignore the orientation at this point)
-            workspace.object_geometries[object_idx].start_pos = object_global_pose[0]
+            workspace.object_geometries[object_idx].curr_pos = object_global_pose[0]
         if armType == "Right" or armType == "Right_torso":
             # ee_idx = robot.right_ee_idx
             # objectInHand = self.objectInRightHand
@@ -220,7 +231,7 @@ class Planner(object):
                 self.objectInRightHand, object_global_pose[0], object_global_pose[1], 
                 physicsClientId=self.planningServer)
             ### update the position and orientation of the object manipulated (ignore the orientation at this point)
-            workspace.object_geometries[object_idx].start_pos = object_global_pose[0]            
+            workspace.object_geometries[object_idx].curr_pos = object_global_pose[0]            
 
     def getObjectGlobalPose(self, local_pose, ee_global_pose):
         temp_object_global_pose = p.multiplyTransforms(
@@ -232,28 +243,37 @@ class Planner(object):
 
 
     def randomRestPose(self, robot, armType):
+        ### option 1: choose from IK dataset
+        if armType == "Right_torso":
+            temp_idx = random.randint(0, len(self.IK_dataset_Right_torso)-1)
+            right_torso_rp = self.IK_dataset_Right_torso[temp_idx]
+            rp = [right_torso_rp[0]] + robot.leftArmCurrConfiguration + right_torso_rp[1:8] + robot.rightHandCurrConfiguration
+            return rp
+
+        ### option 2
         # rp = []
         # for i_joint in range(len(robot.rp)):
         #     joint_value = random.uniform(robot.ll[i_joint], robot.ul[i_joint])
         #     rp.append(joint_value)
         # return rp
 
-        rp = []
-        for i_joint in range(len(robot.rp)):
-            if armType == 'Left_torso' or armType == "Right_torso":
-                if i_joint == 0: 
-                    rp.append(robot.rp[i_joint])
-                    continue
-            joint_value = robot.rp[i_joint] + random.uniform(-0.34, 0.34)
-            ### clipping
-            if joint_value < robot.ll[i_joint]:
-                joint_value = robot.ll[i_joint] + 0.017
-            if joint_value > robot.ul[i_joint]:
-                joint_value = robot.ul[i_joint] - 0.017
-            rp.append(joint_value)
-        return rp
+        ### option 3
+        # rp = []
+        # for i_joint in range(len(robot.rp)):
+        #     if armType == 'Left_torso' or armType == "Right_torso":
+        #         if i_joint == 0: 
+        #             rp.append(robot.rp[i_joint])
+        #             continue
+        #     joint_value = robot.rp[i_joint] + random.uniform(-0.34, 0.34)
+        #     ### clipping
+        #     if joint_value < robot.ll[i_joint]:
+        #         joint_value = robot.ll[i_joint] + 0.017
+        #     if joint_value > robot.ul[i_joint]:
+        #         joint_value = robot.ul[i_joint] - 0.017
+        #     rp.append(joint_value)
+        # return rp
 
-    def generatePrePickingOrPostPlacingPose(self, pose, object_idx, robot, workspace, armType):
+    def generatePrePickingOrPostPlacingPose(self, pose, rest_config, object_idx, robot, workspace, armType):
         ### This function generates a pre-picking / post-placing pose based on grasp pose
         ### It is 5cm (0.05m) behind the approaching direction of z axis (local axis of the end effector)
         ### Input: pose: [[x,y,z], [x,y,z,w]]
@@ -263,6 +283,15 @@ class Planner(object):
         if armType == "Right" or armType == "Right_torso":
             ee_idx = robot.right_ee_idx
             first_joint_index = 8
+
+        if armType == "Left":
+            rest_pose = robot.torsoCurrConfiguration + rest_config + robot.rightArmCurrConfiguration + robot.rightHandCurrConfiguration
+        if armType == "Right":
+            rest_pose = robot.torsoCurrConfiguration + robot.leftArmCurrConfiguration + rest_config + robot.rightHandCurrConfiguration
+        if armType == "Left_torso":
+            rest_pose = [rest_config[0]] + rest_config[1:8] + robot.rightArmCurrConfiguration + robot.rightHandCurrConfiguration
+        if armType == "Right_torso":
+            rest_pose = [rest_config[0]] + robot.leftArmCurrConfiguration + rest_config[1:8] + robot.rightHandCurrConfiguration
 
         temp_rot_matrix = p.getMatrixFromQuaternion(pose[1])
         ### local z-axis of the end effector
@@ -276,7 +305,7 @@ class Planner(object):
                                 targetPosition=new_pose[0], 
                                 targetOrientation=new_pose[1], 
                                 lowerLimits=robot.ll, upperLimits=robot.ul, 
-                                jointRanges=robot.jr, restPoses=robot.rp,
+                                jointRanges=robot.jr, restPoses=rest_pose,
                                 maxNumIterations=2000, residualThreshold=0.0000001,
                                 physicsClientId=robot.server)
         if armType == "Left" or armType == "Right":
@@ -314,12 +343,10 @@ class Planner(object):
             ##########################################################################
         ### you need to return both the statement whether the pose is valid
         ### and the valid configuration the pose corresponds to
-        # if isIKValid:
-        #     print("pre singleArmConfig_IK: " + str(singleArmConfig_IK))
         return isIKValid, FLAG, new_pose, singleArmConfig_IK
 
 
-    def generateConfigBasedOnPose(self, pose, object_idx, robot, workspace, armType):
+    def generateConfigBasedOnPose(self, pose, rest_config, object_idx, robot, workspace, armType):
         ### This function checks the validity of a pose by checking its corresponding config (IK)
         ### Input: pose: [[x,y,z],[x,y,z,w]]
         ###        armType: "Left" or "Right"
@@ -327,11 +354,18 @@ class Planner(object):
         if armType == "Left" or armType == "Left_torso":
             ee_idx = robot.left_ee_idx
             first_joint_index = 1
-            # rest_pose = rest_config + robot.rightArmCurrConfiguration
         if armType == "Right" or armType == "Right_torso":
             ee_idx = robot.right_ee_idx
             first_joint_index = 8
-            # rest_pose = robot.leftArmCurrConfiguration + rest_config
+        
+        if armType == "Left":
+            rest_pose = robot.torsoCurrConfiguration + rest_config + robot.rightArmCurrConfiguration + robot.rightHandCurrConfiguration
+        if armType == "Right":
+            rest_pose = robot.torsoCurrConfiguration + robot.leftArmCurrConfiguration + rest_config + robot.rightHandCurrConfiguration
+        if armType == "Left_torso":
+            rest_pose = [rest_config[0]] + rest_config[1:8] + robot.rightArmCurrConfiguration + robot.rightHandCurrConfiguration
+        if armType == "Right_torso":
+            rest_pose = [rest_config[0]] + robot.leftArmCurrConfiguration + rest_config[1:8] + robot.rightHandCurrConfiguration
 
         ### we add rest pose in the IK solver to get as high-quality IK as possible
         config_IK = p.calculateInverseKinematics(bodyUniqueId=robot.motomanGEO,
@@ -339,7 +373,7 @@ class Planner(object):
                                 targetPosition=pose[0],
                                 targetOrientation=pose[1],
                                 lowerLimits=robot.ll, upperLimits=robot.ul, 
-                                jointRanges=robot.jr, restPoses=robot.rp,
+                                jointRanges=robot.jr, restPoses=rest_pose,
                                 maxNumIterations=2000, residualThreshold=0.0000001,
                                 physicsClientId=robot.server)
         if armType == "Left" or armType == "Right":
@@ -377,8 +411,6 @@ class Planner(object):
             ##########################################################################
         ### you need to return both the statement whether the pose is valid
         ### and the valid configuration the pose corresponds to
-        # if isIKValid:
-        #     print("singleArmConfig_IK: " + str(singleArmConfig_IK))
         return isIKValid, FLAG, singleArmConfig_IK
 
     def checkPoseIK(self, desired_ee_pose, object_idx, robot, workspace, armType):
@@ -916,6 +948,7 @@ class Planner(object):
             if searchSuccess == False:
                 print("the plan fails at the " + str(counter) + "th trial...")
                 ### the plan fails, could not find a solution
+                self.query_idx += 1
                 return result_traj ### an empty trajectory
             ### otherwise, we need collision check and smoothing (len(path) >= 3)
             # start_time = time.time()
@@ -1047,6 +1080,7 @@ class Planner(object):
             ### check the edge validity
             isEdgeValid, FLAG = self.checkEdgeValidity_DirectConfigPath(
                 initialConfig, neighbor, object_idx, robot, workspace, armType)
+            # print("FLAG: " + str(FLAG))
             if isEdgeValid:
                 start_neighbors_idx.append(neighborIndex_to_start[j])
                 start_neighbors_cost.append(neighborDist_to_start[j])
@@ -1065,6 +1099,7 @@ class Planner(object):
             ### check the edge validity
             isEdgeValid, FLAG = self.checkEdgeValidity_DirectConfigPath(
                 targetConfig, neighbor, object_idx, robot, workspace, armType)
+            # print("FLAG: " + str(FLAG))
             if isEdgeValid:
                 goal_neighbors_idx.append(neighborIndex_to_goal[j])
                 goal_neighbors_cost.append(neighborDist_to_goal[j])

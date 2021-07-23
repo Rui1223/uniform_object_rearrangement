@@ -27,7 +27,6 @@ def main(args):
 
     ######## regular resolution reachability checking ###########
     pybullet_plan_scene.deployAllGoalPositions()
-    time.sleep(10000)
     orientations = pybullet_plan_scene.generateOrientations() ### generate all possible orientations
     ### pick an orientation
     orientation = orientations[6]

@@ -37,15 +37,12 @@ class MotomanRobot(object):
             self.motomanGEO = p.loadURDF(
                     fileName=self.urdf_filepath, 
                     basePosition=self.basePosition, baseOrientation=self.baseOrientation, 
-                    useFixedBase=True, physicsClientId=self.server)            
-        self.known_geometries = []
-        self.known_geometries.append(self.motomanGEO)
+                    useFixedBase=True, physicsClientId=self.server)
 
         ### set the robot to the home configuration (both left, right arm and the torso)
         self.leftArmHomeConfiguration = leftArmHomeConfiguration
         self.rightArmHomeConfiguration = rightArmHomeConfiguration
         self.torsoHomeConfiguration = torsoHomeConfiguration
-        # self.armHomeConfiguration = self.leftArmHomeConfiguration + self.rightArmHomeConfiguration
         self.rightHandHomeConfiguration = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
         ################### intrinsic value of the motoman_sda10f ###################
@@ -284,6 +281,11 @@ class MotomanRobot(object):
         self.left_ee_pose = [list(left_ee_pos_quat[0]), list(left_ee_pos_quat[1])]
         right_ee_pos_quat = p.getLinkState(self.motomanGEO, self.right_ee_idx, physicsClientId=self.server)
         self.right_ee_pose = [list(right_ee_pos_quat[0]), list(right_ee_pos_quat[1])]
+
+    def getRobotCurrConfig(self):
+        ### this function return the current full configuration of the robot 
+        ### joints [1(torso) + 7(leftArm) + 7(rightArm) + 6(rightHand)]
+        return [self.torsoCurrConfiguration] + self.leftArmCurrConfiguration + self.rightArmCurrConfiguration + self.rightHandCurrConfiguration
 
 
     def getJointState(self):
