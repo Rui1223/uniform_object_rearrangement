@@ -291,7 +291,7 @@ class WorkspaceTable(object):
 
     def loadInstance_cylinders(self):
 
-        instanceFile = os.path.join(self.rosPackagePath, "examples") + "/1.txt"
+        instanceFile = os.path.join(self.rosPackagePath, "examples") + "/2.txt"
         print("--------load an instance---------")
         self.cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
                                     radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)

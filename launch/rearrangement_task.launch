@@ -7,8 +7,12 @@
         args="$(arg rearrangement_task_planner)" output="screen" required="False" /> -->
 
     <!-- the following node expects argument MRSplanner <num_objects(int)> -->
-    <node pkg="uniform_object_rearrangement" type="MRSplanner.py" name="mrs_task_planner"
-        args="$(arg mrs_task_planner)" output="screen" required="False" />
+    <!-- <node pkg="uniform_object_rearrangement" type="MRSplanner.py" name="mrs_task_planner"
+        args="$(arg mrs_task_planner)" output="screen" required="False" /> -->
+
+    <!-- the following node expects argument DFSDPplanner <num_objects(int)> -->
+    <node pkg="uniform_object_rearrangement" type="DFSDPplanner.py" name="dfsdp_task_planner"
+        args="$(arg dfsdp_task_planner)" output="screen" required="False" />
 
     <node pkg="uniform_object_rearrangement" type="PybulletExecutionScene.py" name="pybullet_execution_scene"
 		    output="screen" required="True" />

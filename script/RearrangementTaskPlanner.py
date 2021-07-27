@@ -38,9 +38,7 @@ class RearrangementTaskPlanner(object):
         self.num_objects = int(args[1])
 
     def serviceCall_generateInstanceCylinder(self):
-        print("is the node alive????????????????")
         rospy.wait_for_service("generate_instance_cylinder")
-        print("service is there!!!!")
         request = GenerateInstanceCylinderRequest()
         request.num_objects = self.num_objects
         try:
