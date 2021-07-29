@@ -918,7 +918,7 @@ class Planner(object):
 
 
     def AstarPathFinding(self, initialConfig, targetConfig, object_idx, robot, workspace, armType):
-        ### Input: initialConfig, configToPreGraspPose [q1, q2, ..., q7]
+        ### Input: initialConfig, targetConfig [q1, q2, ..., q7]
         ### Output: traj (format: [joint_state1, joint_state2, ...])
         ###         and joint_state is a list of joint values
         ### first prepare the start_goal file
@@ -955,6 +955,73 @@ class Planner(object):
             smoothed_path, isPathValid, violated_edges = self.smoothPath(
                     path, initialConfig, targetConfig, object_idx, robot, workspace, armType)
             # print("Time for smooth the path: {}".format(time.time() - start_time))
+
+        ### congrats, the path is valid and finally smoothed, let's generate trajectory
+        print("smoothed path: ", smoothed_path)
+        ### directly generate trajectory based on the new path
+        for i in range(0, len(smoothed_path)-1):
+            if i == 0:
+                config1 = initialConfig
+            else:
+                config1 = self.nodes[armType][smoothed_path[i]]
+            if i == (len(smoothed_path)-2):
+                config2 = targetConfig
+            else:
+                config2 = self.nodes[armType][smoothed_path[i+1]]
+            ### get edge trajectory
+            config_edge_traj = self.generateTrajectory_DirectConfigPath(config1, config2, robot, armType, object_idx, workspace)
+            # result_traj.append(config_edge_traj)
+            result_traj += config_edge_traj
+
+        ### before you claim the victory of this query, increment the planning query
+        ### so as to tell people this query is over, next time is a new query
+        self.query_idx += 1
+
+        return result_traj
+
+
+    def AstarPathFinding_new(self, initialConfig, targetConfig,
+                start_neighbors_idx, start_neighbors_cost, 
+                goal_neighbors_idx, goal_neighbors_cost,
+                object_idx, robot, workspace, armType):
+        ### Input: initialConfig, targetConfig [q1, q2, ..., q7]
+        ###        neighbors_idx as well as neighbors_cost should not be empty when entering in this function
+        ### Output: traj (format: [joint_state1, joint_state2, ...])
+        ###         and joint_state is a list of joint values
+
+        # print("===================================")
+        # print("===================================")
+        # print("start_neighbors_idx: " + str(start_neighbors_idx))
+        # print("start_neighbors_cost: " + str(start_neighbors_cost))
+        # print("goal_neighbors_idx: " + str(goal_neighbors_idx))
+        # print("goal_neighbors_cost: " + str(goal_neighbors_cost))
+
+        result_traj = [] ### the output we want to construct
+        isPathValid = False
+        print("current planning query: ", self.query_idx)
+        violated_edges = [] ### initially there are no violated edges
+
+        counter = 0
+        while (isPathValid == False):
+            counter += 1
+            ### trigger new call within the same query idx
+            # start_time = time.time()
+            searchSuccess, path =  self.serviceCall_astarPathFinding(
+                    violated_edges, initialConfig, targetConfig, 
+                    start_neighbors_idx, goal_neighbors_idx,
+                    start_neighbors_cost, goal_neighbors_cost,
+                    robot, workspace, armType)
+            # print("Time for service call for astarPathFinding: {}".format(time.time() - start_time))
+            if searchSuccess == False:
+                print("the plan fails at the " + str(counter) + "th trial...")
+                ### the plan fails, could not find a solution
+                self.query_idx += 1
+                return result_traj ### an empty trajectory
+            ### otherwise, we need collision check and smoothing (len(path) >= 3)
+            # start_time = time.time()
+            smoothed_path, isPathValid, violated_edges = self.smoothPath(
+                    path, initialConfig, targetConfig, object_idx, robot, workspace, armType)
+            # print("Time for smooth the path: {}".format(time.time() - start_time))            
 
         ### congrats, the path is valid and finally smoothed, let's generate trajectory
         print("smoothed path: ", smoothed_path)
@@ -1018,6 +1085,7 @@ class Planner(object):
             else:
                 if (curr_idx - start_idx == 1):
                     print("Edge invalid, we need call A* again with the change of edge information")
+                    print("FLAG: " + str(FLAG))
                     print(str(startNode_idx) + "," + str(currNode_idx))
                     edge = Edge()
                     edge.idx1 = startNode_idx
@@ -1035,6 +1103,47 @@ class Planner(object):
         smoothed_path.append(validNodeFromStart_idx)
 
         return smoothed_path, True, violated_edges
+
+
+    def connectToNeighbors(self, config, object_idx, robot, workspace, armType):
+        ### This function makes connections 
+        ### between the specified config to neighboring nodes in the roadmap
+        ### It returns (1) whether the config can be connected to any neighbors (isConfigValid)
+        ###            (2) the neighbors it connects with
+        neighbors_idx = []
+        neighbors_cost = []
+        connectSuccess = False
+
+        dist = [utils.calculateNorm2(config, neighborConfig) for neighborConfig in self.nodes[armType]]
+        neighborIndex, neighborDist = zip(*sorted(enumerate(dist), key=itemgetter(1)))
+        neighborIndex = list(neighborIndex)
+        neighborDist = list(neighborDist)
+
+        # max_neighbors = self.num_neighbors
+        max_neighbors = 5
+        max_candiates_to_consider = self.num_neighbors
+
+        ####### now connect potential neighbors for the specified config #######
+        neighbors_connected = 0
+        for j in range(max_candiates_to_consider):
+            ### first check if the query node has already connected to enough neighbors
+            if neighbors_connected >= max_neighbors:
+                break
+            ### otherwise, find the neighbor
+            neighbor = self.nodes[armType][neighborIndex[j]]
+            ### check the edge validity
+            isEdgeValid, FLAG = self.checkEdgeValidity_DirectConfigPath(
+                    config, neighbor, object_idx, robot, workspace, armType)
+            # print("FLAG: " + str(FLAG))
+            if isEdgeValid:
+                neighbors_idx.append(neighborIndex[j])
+                neighbors_cost.append(neighborDist[j])
+                neighbors_connected += 1
+        
+        ### check if the number of neighboring connections is zero
+        print("Number of neighbors for current node: " + str(neighbors_connected))
+        if neighbors_connected != 0: connectSuccess = True
+        return connectSuccess, neighbors_idx, neighbors_cost
 
 
     def findNeighborsForStartAndGoal(self,

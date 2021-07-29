@@ -8,9 +8,6 @@ import time
 import sys
 import os
 
-from MotomanRobot import MotomanRobot
-from WorkspaceTable import WorkspaceTable
-from Planner import Planner
 from PybulletPlanScene import PybulletPlanScene
 
 import rospy

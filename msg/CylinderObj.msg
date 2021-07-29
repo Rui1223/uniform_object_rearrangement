@@ -2,7 +2,10 @@
 
 int32 obj_idx
 geometry_msgs/Point curr_position
+int32 curr_position_idx
 geometry_msgs/Point goal_position
+int32 goal_position_idx
+bool isAtCurrPosition
 float32 radius
 float32 height
 std_msgs/ColorRGBA rgbacolor

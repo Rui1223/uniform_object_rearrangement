@@ -53,6 +53,8 @@
 
 	<group ns="object_goal_deployment">
 		<!-- specification of deploying object goal positions -->
+		<rosparam param="discretization_x">0.06</rosparam>
+		<rosparam param="discretization_y">0.06</rosparam>
 		<rosparam param="object_interval_x">0.18</rosparam>
 		<rosparam param="object_interval_y">0.24</rosparam>
 		<rosparam param="side_clearance_x">0.05</rosparam>

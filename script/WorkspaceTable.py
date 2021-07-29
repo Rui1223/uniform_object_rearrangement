@@ -13,6 +13,7 @@ import IPython
 from random import uniform, random
 
 from CollisionChecker import CollisionChecker
+import utils
 
 from uniform_object_rearrangement.msg import CylinderObj
 
@@ -84,14 +85,14 @@ class WorkspaceTable(object):
         print("table: " + str(self.tableM))
         self.known_geometries.append(self.tableM)
 
-        # print("inner edge of the table: ")
-        # print(self.tablePosition[0]-table_dim[0]/2)
-        # print("table surface: ")
-        # print(self.tablePosition[2]+table_dim[2]/2)
-        # print("left side of the table: ")
-        # print(self.tablePosition[1]+table_dim[1]/2)
-        # print("right side of the table: ")
-        # print(self.tablePosition[1]-table_dim[1]/2)
+        print("inner edge of the table: ")
+        print(self.tablePosition[0]-table_dim[0]/2)
+        print("table surface: ")
+        print(self.tablePosition[2]+table_dim[2]/2)
+        print("left side of the table: ")
+        print(self.tablePosition[1]+table_dim[1]/2)
+        print("right side of the table: ")
+        print(self.tablePosition[1]-table_dim[1]/2)
         #################################################################################
 
     def addConstrainedArea(self, ceiling_height, thickness_flank):
@@ -157,15 +158,18 @@ class WorkspaceTable(object):
         print("back flank: " + str(self.backFlankM))
         print("top flank: " + str(self.topFlankM))
         # print("constrained_area_center: ", str(self.constrained_area_center))
-        # print("constrained_area_x_limit", str(self.constrained_area_x_limit))
-        # print("constrained_area_y_limit", str(self.constrained_area_y_limit))
+        print("constrained_area_x_limit", str(self.constrained_area_x_limit))
+        print("constrained_area_y_limit", str(self.constrained_area_y_limit))
         # print("constrained_area_dim", str(self.constrained_area_dim))
         ###########################################################################################
 
-    def getObjectDeployment(self, cylinder_radius, cylinder_height, 
-                object_interval_x, object_interval_y, side_clearance_x, side_clearance_y):
+    def setDeploymentParam(self, 
+            cylinder_radius, cylinder_height, discretization_x, discretization_y, 
+            object_interval_x, object_interval_y, side_clearance_x, side_clearance_y):
         self.cylinder_radius = cylinder_radius
         self.cylinder_height = cylinder_height
+        self.discretization_x = discretization_x
+        self.discretization_y = discretization_y
         self.object_interval_x = object_interval_x
         self.object_interval_y = object_interval_y
         self.side_clearance_x = side_clearance_x
@@ -187,14 +191,23 @@ class WorkspaceTable(object):
                 timeout -= 1
                 ### generate the center of an object with uniform distribution
                 ### uniform_x(0.89, 1.235), uniform_y(-0.605, 0.585)
+                # start_pos = [
+                #     round(uniform(self.constrained_area_x_limit[0] + 0.02 + self.cylinder_radius, \
+                #                     self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius - 0.02), 3),
+                #     round(uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
+                #                     self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius - 0.02), 3),
+                #     round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)
+                # ]
+                # rgbacolor = [round(random(), 3), round(random(), 3), round(random(), 3), 1.0]
+
+                ### uniform_x(0.87, 1.255), uniform_y(-0.605, 0.605)
                 start_pos = [
-                    round(uniform(self.constrained_area_x_limit[0] + 0.02 + self.cylinder_radius, \
-                                    self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius - 0.02), 3),
+                    round(uniform(self.constrained_area_x_limit[0] + self.cylinder_radius, \
+                                    self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius), 3),
                     round(uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
-                                    self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius - 0.02), 3),
+                                    self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius), 3),
                     round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)
                 ]
-                # rgbacolor = [round(random(), 3), round(random(), 3), round(random(), 3), 1.0]
                 rgbacolor = self.color_pools[obj_i] + [1.0] ### No transparency
                 cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
                                 radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=rgbacolor, physicsClientId=self.server)
@@ -211,16 +224,17 @@ class WorkspaceTable(object):
                 return False
             else:
                 ### congrats, the object's location is accepted
+                ### assign the start position to the closest candidate position
+                start_position_idx = self.assignToNearestCandiate(start_pos)
                 self.object_geometries[obj_i] = CylinderObject(
-                            obj_i, start_pos, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
+                            obj_i, start_pos, start_position_idx, False, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
 
-        ### generate goal positions
-        self.deployAllGoalPositions()
         ### assign goal positions
-        for obj_idx, goal_pos in self.all_goal_positions.items():
+        self.assignGoalPositions()
+        for obj_idx, position_idx in self.all_goal_positions.items():
             if (obj_idx >= self.num_objects):
                 break
-            self.object_geometries[obj_idx].setGoalPosition(goal_pos) ### assignment goal position
+            self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx) ### assignment goal position
             ### visualize it for confirmation
             temp_rgbacolor = [self.object_geometries[obj_idx].rgbacolor[0], self.object_geometries[obj_idx].rgbacolor[1], 
                                 self.object_geometries[obj_idx].rgbacolor[2], 0.25]
@@ -228,7 +242,7 @@ class WorkspaceTable(object):
                     radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=temp_rgbacolor, physicsClientId=self.server)
             temp_cylinder_objectM = p.createMultiBody(
                     baseVisualShapeIndex=temp_cylinder_v,
-                basePosition=goal_pos, physicsClientId=self.server)
+                basePosition=self.all_position_candidates[position_idx], physicsClientId=self.server)
 
         ############## printing test ##############
         for obj_idx in range(self.num_objects):
@@ -252,7 +266,10 @@ class WorkspaceTable(object):
                 round(cylinder_obj.rgbacolor.r, 3), round(cylinder_obj.rgbacolor.g, 3), 
                 round(cylinder_obj.rgbacolor.b, 3), round(cylinder_obj.rgbacolor.a, 3)]
             cylinder_curr_position = [cylinder_obj.curr_position.x, cylinder_obj.curr_position.y, cylinder_obj.curr_position.z]
+            cylinder_curr_position_idx = cylinder_obj.curr_position_idx
             cylinder_goal_position = [cylinder_obj.goal_position.x, cylinder_obj.goal_position.y, cylinder_obj.goal_position.z]
+            cylinder_goal_position_idx = cylinder_obj.goal_position_idx
+            cylinder_isAtCurrPosition = cylinder_obj.isAtCurrPosition
             cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
                 radius=cylinder_radius, height=cylinder_height, physicsClientId=self.server)
             cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
@@ -260,9 +277,9 @@ class WorkspaceTable(object):
             cylinder_objectM = p.createMultiBody(baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v,
                 basePosition=cylinder_curr_position, physicsClientId=self.server)
             self.object_geometries[cylinder_obj.obj_idx] = CylinderObject(
-                cylinder_obj.obj_idx, cylinder_curr_position, cylinder_objectM, 
-                cylinder_obj.radius, cylinder_obj.height, cylinder_rgbacolor)
-            self.object_geometries[cylinder_obj.obj_idx].setGoalPosition(cylinder_goal_position)
+                cylinder_obj.obj_idx, cylinder_curr_position, cylinder_curr_position_idx, cylinder_isAtCurrPosition, 
+                cylinder_objectM, cylinder_obj.radius, cylinder_obj.height, cylinder_rgbacolor)
+            self.object_geometries[cylinder_obj.obj_idx].setGoalPosition(cylinder_goal_position, cylinder_goal_position_idx)
         
         return True
 
@@ -276,9 +293,12 @@ class WorkspaceTable(object):
             cylinder_object.curr_position.x = self.object_geometries[obj_i].curr_pos[0]
             cylinder_object.curr_position.y = self.object_geometries[obj_i].curr_pos[1]
             cylinder_object.curr_position.z = self.object_geometries[obj_i].curr_pos[2]
+            cylinder_object.curr_position_idx = self.object_geometries[obj_i].curr_position_idx
             cylinder_object.goal_position.x = self.object_geometries[obj_i].goal_pos[0]
             cylinder_object.goal_position.y = self.object_geometries[obj_i].goal_pos[1]
             cylinder_object.goal_position.z = self.object_geometries[obj_i].goal_pos[2]
+            cylinder_object.goal_position_idx = self.object_geometries[obj_i].goal_position_idx
+            cylinder_object.isAtCurrPosition = self.object_geometries[obj_i].isAtCurrPosition
             cylinder_object.radius = self.cylinder_radius
             cylinder_object.height = self.cylinder_height
             cylinder_object.rgbacolor.r = self.object_geometries[obj_i].rgbacolor[0]
@@ -331,6 +351,9 @@ class WorkspaceTable(object):
 
             ### before the next loop
             counter += 1
+        
+        f_instance.close()
+
 
         ############## printing test ##############
         for obj_idx in range(self.num_objects):
@@ -341,7 +364,107 @@ class WorkspaceTable(object):
         return True
 
 
-    def deployAllGoalPositions(self, object_interval_x=None, object_interval_y=None):
+    def deployAllPositionCandidates(self, discretization_x=None, discretization_y=None):
+        ################ This function calculate all possible postions (x,y) ################
+        ################### given the constrained area + discretization #####################
+        if discretization_x == None: discretization_x = self.discretization_x
+        if discretization_y == None: discretization_y = self.discretization_y
+        self.all_position_candidates = OrderedDict()
+        ### formula for compute n_y and n_x (number of objects in y and x direction)
+        ### 0.02 + r + d_x*(n_x - 1) + (r + sc_x) = |x|
+        ### (r + sc_y) + d_y*(n_y - 1) + (r + sc_y) = |y|
+        self.n_candidates_x = \
+            int(np.floor((self.constrained_area_dim[0] - 0.02 - self.side_clearance_x + discretization_x - 2*self.cylinder_radius) / discretization_x))
+        self.n_candidates_y = \
+            int(np.floor((self.constrained_area_dim[1] - 2*self.side_clearance_y + discretization_y - 2*self.cylinder_radius) / discretization_y))
+
+        candidate_idx = 0
+        for x_i in range(self.n_candidates_x):
+            for y_j in range(self.n_candidates_y):
+                candidate_pos = [
+                    round(self.constrained_area_x_limit[0] + 0.02 + self.cylinder_radius + discretization_x * x_i, 3),
+                    round(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius + discretization_y * y_j, 3),
+                    round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)                    
+                ]
+                self.all_position_candidates[candidate_idx] = candidate_pos
+                candidate_idx += 1
+        self.positionCandidate_x_limit = [self.all_position_candidates[0][0], self.all_position_candidates[len(self.all_position_candidates)-1][0]]
+        self.positionCandidate_y_limit = [self.all_position_candidates[0][1], self.all_position_candidates[len(self.all_position_candidates)-1][1]]
+        print("print all position candidates")
+        print(self.all_position_candidates)
+
+    def assignGoalPositions(self, object_interval_x=None, object_interval_y=None):
+        ### assign goal positions based on #objects, all_position_candidates
+        ### as well as object_interval_x and object_interval_y
+        if object_interval_x == None: object_interval_x = self.object_interval_x
+        if object_interval_y == None: object_interval_y = self.object_interval_y
+        self.all_goal_positions = OrderedDict()
+
+        self.incremental_x = int(object_interval_x / self.discretization_x)
+        self.incremental_y = int(object_interval_y / self.discretization_y)
+
+        temp_row_start_idx = 0
+        row_counter = 1
+        candidate_idx = 0
+        for obj_i in range(self.num_objects):
+            self.all_goal_positions[obj_i] = candidate_idx
+            ### move on to the next goal
+            candidate_idx += self.incremental_y
+            row_counter += self.incremental_y
+            if row_counter > self.n_candidates_y:
+                ### switch to the next row for goals
+                candidate_idx = temp_row_start_idx + self.n_candidates_y * self.incremental_x
+                temp_row_start_idx = candidate_idx
+                row_counter = 1
+        
+        print("all_goal_positions: ")
+        for obj_idx, position_idx in self.all_goal_positions.items():
+            print(str(obj_idx) + ": " + str(position_idx))
+
+    def assignToNearestCandiate(self, position):
+        ### given a position (x,y,z), calculate the nearest candidate to that position
+        ### and return the idx of the position candidate
+        print("position: ", position)
+        potential_neighbor_indexes = []
+        x_value = math.floor((position[0]-self.positionCandidate_x_limit[0])/self.discretization_x)
+        if x_value < 0:
+            ### very close to constraint area x lower limit
+            x_indexes = [0]
+        elif x_value >= self.n_candidates_x - 1:
+            ### very close to constraint area x upper limit
+            x_indexes = [self.n_candidates_x - 1] 
+        else:
+            x_indexes = [x_value, x_value+1]
+        y_value = math.floor((position[1]-self.positionCandidate_y_limit[0])/self.discretization_y)
+        if y_value < 0:
+            ### very close to constraint area y lower limit
+            y_indexes = [0]
+        elif y_value >= self.n_candidates_y - 1:
+            ### very close to constraint area y upper limit
+            y_indexes = [self.n_candidates_y - 1] 
+        else:
+            y_indexes = [y_value, y_value+1]
+
+        print("checking")
+        print(y_indexes)
+        print(x_indexes)
+        for y_idx in y_indexes:
+            for x_idx in x_indexes:
+                potential_neighbor_indexes.append(x_idx*self.n_candidates_y+y_idx)
+        print(potential_neighbor_indexes)
+        ### find the nearest candidate
+        nearest_candidate_dist = np.inf
+        for neighbor_idx in potential_neighbor_indexes:
+            temp_dist = utils.computePoseDist_pos(position, self.all_position_candidates[neighbor_idx])
+            if temp_dist < nearest_candidate_dist:
+                nearest_candidate_dist = temp_dist
+                nearest_candidate_idx = neighbor_idx
+        
+        print(nearest_candidate_idx)
+
+        return nearest_candidate_idx
+
+    def deployAllGoalPositions_backup(self, object_interval_x=None, object_interval_y=None):
         ################ This function calculate all possible postions (x,y) ################
         ############### given the constrained area + distance between objects ###############
         if object_interval_x == None: object_interval_x = self.object_interval_x
@@ -365,6 +488,7 @@ class WorkspaceTable(object):
                 obj_idx += 1
         print("print all goal positions")
         print(self.all_goal_positions)
+        input("check goal positions!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
     def updateObjectMesh(self, obj_idx, position, orientation=[0, 0, 0, 1]):
         ### input - target_pose: [x, y, z]
@@ -384,15 +508,18 @@ class AnyObject(object):
         self.pos = pos
     
 class CylinderObject(AnyObject):
-    def __init__(self, index, curr_pos, geo, cylinder_radius, cylinder_height, rgbacolor):
+    def __init__(self, index, curr_pos, curr_position_idx, isAtCurrPosition, geo, cylinder_radius, cylinder_height, rgbacolor):
         ### invoking the __init__ of the parent class
         AnyObject.__init__(self, index, curr_pos, geo)
+        self.curr_position_idx = curr_position_idx
+        self.isAtCurrPosition = isAtCurrPosition
         self.cylinder_radius = cylinder_radius
         self.cylinder_height = cylinder_height
         self.rgbacolor = rgbacolor
 
-    def setGoalPosition(self, goal_pos):
+    def setGoalPosition(self, goal_pos, goal_position_idx):
         self.goal_pos = goal_pos
+        self.goal_position_idx = goal_position_idx
 
 
 

@@ -43,6 +43,7 @@ class PybulletExecutionScene(object):
         standingBase_dim, table_dim, table_offset_x, \
         camera_extrinsic, camera_intrinsic, \
         cylinder_radius, cylinder_height, \
+        discretization_x, discretization_y, \
         object_interval_x, object_interval_y, \
         side_clearance_x, side_clearance_y, \
         ceiling_height, thickness_flank, \
@@ -65,8 +66,10 @@ class PybulletExecutionScene(object):
         ### setup the workspace
         self.setupWorkspace(standingBase_dim, table_dim, table_offset_x, object_mesh_path, True)
         self.workspace_e.addConstrainedArea(ceiling_height, thickness_flank)
-        self.workspace_e.getObjectDeployment(cylinder_radius, cylinder_height, \
+        self.workspace_e.setDeploymentParam(
+                cylinder_radius, cylinder_height, discretization_x, discretization_y, \
                 object_interval_x, object_interval_y, side_clearance_x, side_clearance_y)
+        self.workspace_e.deployAllPositionCandidates()
         self.setupCamera(camera_extrinsic, camera_intrinsic)
 
         ### create an executor assistant
@@ -139,9 +142,8 @@ class PybulletExecutionScene(object):
     def generate_instance_cylinder_callback(self, req):
         ### given the request data: num_objects (int32)
         rospy.logwarn("GENERATE REARRANGEMENT INSTANCE")
-        self.num_objects = req.num_objects
-        success = self.workspace_e.loadInstance_cylinders()
-        # success = self.workspace_e.generateInstance_cylinders(self.num_objects)
+        # success = self.workspace_e.loadInstance_cylinders()
+        success = self.workspace_e.generateInstance_cylinders(req.num_objects)
         if success == True:
             print("successfully generate an instance")
         else:
@@ -221,6 +223,14 @@ class PybulletExecutionScene(object):
             rospy.sleep(0.2)
         cylinder_height = rospy.get_param('/uniform_cylinder_object/height')
 
+        while not rospy.has_param('/object_goal_deployment/discretization_x'):
+            rospy.sleep(0.2)
+        discretization_x = rospy.get_param('/object_goal_deployment/discretization_x')
+
+        while not rospy.has_param('/object_goal_deployment/discretization_y'):
+            rospy.sleep(0.2)
+        discretization_y = rospy.get_param('/object_goal_deployment/discretization_y')
+
         while not rospy.has_param('/object_goal_deployment/object_interval_x'):
             rospy.sleep(0.2)
         object_interval_x = rospy.get_param('/object_goal_deployment/object_interval_x')
@@ -254,6 +264,7 @@ class PybulletExecutionScene(object):
             standingBase_dim, table_dim, table_offset_x, \
             camera_extrinsic, camera_intrinsic, \
             cylinder_radius, cylinder_height, \
+            discretization_x, discretization_y, \
             object_interval_x, object_interval_y, \
             side_clearance_x, side_clearance_y, \
             ceiling_height, thickness_flank, \
