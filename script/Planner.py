@@ -123,7 +123,6 @@ class Planner(object):
                 self.nodes[armType].append(ikSolution)
                 temp_counter += 1
                 print("finish the %s node" % str(temp_counter))
-                # input("enter to continue")
             ##########################################################################
 
     def singleSampling_CSpace(self, robot, armType):
@@ -1258,3 +1257,68 @@ class Planner(object):
         if armType == "Right" or armType == "Right_torso":
             self.isObjectInRightHand = False
             self.objectInRightHand = None
+
+    
+    def attachObject_loadmap(self, workspace, robot, armType):
+        if armType == "Right" or armType == "Right_torso":
+            self.isObjectInRightHand = True
+            ### specify the pre-computed local pose
+            self.rightLocalPose = [[0.09468472003936768, 0.0007766783237457275, -0.0014880895614624023], \
+                        [0.0924038216471672, -0.700919508934021, -0.09246741980314255, 0.7011584639549255]]
+            ####### use that local pose to generate the sample_object #######
+            ### get the global pose of the object
+            sample_object_global_pose = self.getObjectGlobalPose(self.rightLocalPose, robot.right_ee_pose)
+            sample_object_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER, radius=workspace.cylinder_radius, 
+                        height=workspace.cylinder_height, physicsClientId=self.planningServer)
+            sample_object_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                radius=workspace.cylinder_radius, length=workspace.cylinder_height, 
+                rgbaColor=[1.0, 0.0, 0.0, 0.8], physicsClientId=self.planningServer)
+            sample_objectM = p.createMultiBody(
+                baseCollisionShapeIndex=sample_object_c, baseVisualShapeIndex=sample_object_v,
+                basePosition=sample_object_global_pose[0], baseOrientation=sample_object_global_pose[1], 
+                physicsClientId=self.planningServer)
+            self.objectInRightHand = sample_objectM
+    
+    def detachObject_loadmap(self, armType):
+        if armType == "Right" or armType == "Right_torso":
+            self.isObjectInRightHand = False
+            p.removeBody(self.objectInRightHand)
+            self.objectInRightHand = None
+
+    # def samplesConnect_advanced(self, robot, workspace, armType):
+    #     connectivity = np.zeros((self.nsamples, self.nsamples))
+    #     tree = spatial.KDTree(self.nodes[armType]) ### use KD tree to arrange neighbors assignment
+    #     connectionsFile = self.roadmapFolder + "/connections_" + str(armType) + ".txt"
+    #     f_connection = open(connectionsFile, "w")
+    #     ### for each node
+    #     for node_idx in range(len(self.nodes[armType])):
+    #         queryNode = self.nodes[armType][node_idx]
+    #         knn = tree.query(queryNode, k=self.num_neighbors, p=2)
+
+    #         neighbors_connected = 0
+    #         ### for each potential neighbor
+    #         for j in range(len(knn[1])):
+    #             ### first check if this query node has already connected to enough neighbors
+    #             if neighbors_connected >= self.num_neighbors:
+    #                 break
+    #             if knn[1][j] == node_idx:
+    #                 ### if the neighbor is the query node itself
+    #                 continue
+    #             if connectivity[node_idx][knn[1][j]] == 1:
+    #                 ### the connectivity has been checked before
+    #                 neighbors_connected += 1
+    #                 continue
+    #             ### Otherwise, check the edge validity
+    #             ### in terms of collision with the robot itself and all known geometries (e.g. table/shelf)
+    #             ### between the query node and the current neighbor
+    #             neighbor = self.nodes[armType][knn[1][j]]
+    #             isEdgeValid, FLAG = self.checkEdgeValidity_knownGEO(queryNode, neighbor, robot, workspace, armType)
+    #             if not isEdgeValid:
+    #                 ### we don't allow any collision with known geometry when there is no object in hand
+    #                 continue
+    #             ### you are reaching here as the edge pass the collision check 
+    #             ### with robot self-collision and robot-known_geometry
+    #             ### now check the collision between the robot and position candidate
+    #             isEdgeValid, FLAG = self.checkEdgeValidity_ positionCandidates_labeledRoadmap(
+    #                 queryNode, neighbor, robot, workspace, armType)
+
