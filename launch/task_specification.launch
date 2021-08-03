@@ -10,7 +10,8 @@
 		<!-- <rosparam param="leftArmHomeConfiguration">[0.0, 0.0, 0.0, -0.2, 0.0, 0.0, 0.0]</rosparam>
 		<rosparam param="rightArmHomeConfiguration">[0.0, 0.0, 0.0, -0.2, 0.0, 0.0, 0.0]</rosparam> -->
 		<rosparam param="leftArmHomeConfiguration">[1.75, 0.8, 0.0, -0.66, 0.0, 0.0, 0.0]</rosparam>
-		<rosparam param="rightArmHomeConfiguration">[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</rosparam>
+		<!-- <rosparam param="rightArmHomeConfiguration">[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</rosparam> -->
+		<rosparam param="rightArmHomeConfiguration">[0.0, 0.0, 0.0, -2.08, 0.0, 0.0, 0.0]</rosparam>
 		<rosparam param="torsoHomeConfiguration">0.0</rosparam>
 		<rosparam param="urdfFile">urdf/motoman.urdf</rosparam>
 	</group>

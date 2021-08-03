@@ -308,7 +308,7 @@ class WorkspaceTable(object):
 
     def loadInstance_cylinders(self):
 
-        instanceFile = os.path.join(self.rosPackagePath, "examples") + "/1.txt"
+        instanceFile = os.path.join(self.rosPackagePath, "examples") + "/2.txt"
         print("--------load an instance---------")
         self.cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
                                     radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
@@ -415,9 +415,9 @@ class WorkspaceTable(object):
                 temp_row_start_idx = candidate_idx
                 row_counter = 1
         
-        print("all_goal_positions: ")
-        for obj_idx, position_idx in self.all_goal_positions.items():
-            print(str(obj_idx) + ": " + str(position_idx))
+        # print("all_goal_positions: ")
+        # for obj_idx, position_idx in self.all_goal_positions.items():
+        #     print(str(obj_idx) + ": " + str(position_idx))
 
     def assignToNearestCandiate(self, position):
         ### given a position (x,y,z), calculate the nearest candidate to that position
@@ -477,8 +477,8 @@ class WorkspaceTable(object):
             self.object_geometries[candidate_idx] = CylinderObject(
                 candidate_idx, candidate_pos, candidate_idx, True, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
         ### printing test
-        for candidate_idx, cylinder_object in self.object_geometries.items():
-            print(str(candidate_idx) + ": " + str(cylinder_object.curr_pos))
+        # for candidate_idx, cylinder_object in self.object_geometries.items():
+        #     print(str(candidate_idx) + ": " + str(cylinder_object.curr_pos))
 
 
 ### general class of object in the workspace

@@ -28,8 +28,10 @@ def main(args):
     
     ### Now generate object geometries on all position candidates
     pybullet_plan_scene.workspace_p.generateCandidatesGeometry_labeledRoadmap()
-    pybullet_plan_scene.planner_p.samplesConnect_advanced(
+    pybullet_plan_scene.planner_p.samplesConnect_labeledRoadmap(
         pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "Right_torso")
+    
+    time.sleep(10000)
 
 
 if __name__ == '__main__':
