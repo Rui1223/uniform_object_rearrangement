@@ -45,20 +45,26 @@ class DFSDPplanner(object):
         ### set the rospkg path
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
-        self.num_objects = int(args[1])
+
+    def setPlanningParams(self, num_objects):
+        self.num_objects = num_objects
         self.all_objects = [i for i in range(self.num_objects)]
         self.object_ordering = [] ### a list of obj_idx
         self.object_paths = [] ### a list of ObjectRearrangePath paths
         self.explored = [] ### a list of set() - current object set (e.g, (1,2,3) == (3,2,1))
+        self.time_threshold = 180 ### 180s
+        self.planning_startTime = time.time()
 
-    def serviceCall_generateInstanceCylinder(self):
+    def serviceCall_generateInstanceCylinder(self, num_objects, instance_number, isNewInstance):
         rospy.wait_for_service("generate_instance_cylinder")
         request = GenerateInstanceCylinderRequest()
-        request.num_objects = self.num_objects
+        request.num_objects = num_objects
+        request.instance_number = instance_number
+        request.isNewInstance = isNewInstance
         try:
             generateInstanceCylinder_proxy = rospy.ServiceProxy(
                         "generate_instance_cylinder", GenerateInstanceCylinder)
-            success = generateInstanceCylinder_proxy(request.num_objects)
+            success = generateInstanceCylinder_proxy(request.num_objects, request.instance_number, request.isNewInstance)
             return success.success
         except rospy.ServiceException as e:
             print("generate_instance_cylinder service call failed: %s" % e)
@@ -177,7 +183,11 @@ class DFSDPplanner(object):
            but it remembers all the explored status'''
         ### (1) update self.object_ordering and self.paths (a list of ObjectRearrangePath paths)
         ### (2) increment the explored list (item: set())
-        ### (3) return FLAG==true if the problem is solved by DFS_DP (an indication of monotonicity)   
+        ### (3) return FLAG==true if the problem is solved by DFS_DP (an indication of monotonicity)
+
+        ### first check time constraint
+        if time.time() - self.planning_startTime >= self.time_threshold:
+            return False
         print("object_ordering: " + str(self.object_ordering))
         FLAG = False
         ### check the base case: object_ordering has been fully filled
@@ -235,11 +245,18 @@ def main(args):
     dfsdp_task_planner.rosInit()
     rate = rospy.Rate(10) ### 10hz
 
-    initialize_instance_success = dfsdp_task_planner.serviceCall_generateInstanceCylinder()
+    ### get the arguments
+    ### get the arguments
+    num_objects = int(args[1])
+    instance_number = int(args[2])
+    isNewInstance = True if args[3] == 'g' else False
+
+    initialize_instance_success = dfsdp_task_planner.serviceCall_generateInstanceCylinder(
+                                                    num_objects, instance_number, isNewInstance)
     if initialize_instance_success:
         cylinder_objects = dfsdp_task_planner.serviceCall_cylinderPositionEstimate()
         reproduce_instance_success = dfsdp_task_planner.serviceCall_reproduceInstanceCylinder(cylinder_objects)
-        input("WELCOME TO DFS_DP PLANNER TERRITORY")
+        dfsdp_task_planner.setPlanningParams(len(cylinder_objects))
         start_time = time.time()
         TASK_SUCCESS = dfsdp_task_planner.DFS_DP()
         print("Time for planning is: {}".format(time.time() - start_time))

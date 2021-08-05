@@ -912,7 +912,7 @@ class Planner(object):
             print("Service call failed: %s" % e)
 
 
-    def AstarPathFinding_new(self, initialConfig, targetConfig,
+    def AstarPathFinding(self, initialConfig, targetConfig,
                 start_neighbors_idx, start_neighbors_cost, 
                 goal_neighbors_idx, goal_neighbors_cost,
                 robot, workspace, armType):

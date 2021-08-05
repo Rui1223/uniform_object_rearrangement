@@ -305,7 +305,7 @@ class PybulletPlanScene(object):
             ################### plan the path to pre-picking configuration ############################
             connectSuccess, currConfig_neighbors_idx, currConfig_neighbors_cost = self.planner_p.connectToNeighbors(
                         currConfig, self.robot_p, self.workspace_p, req.armType)
-            prePicking_traj = self.planner_p.AstarPathFinding_new(currConfig, configToPrePickingPose, 
+            prePicking_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePickingPose, 
                                 currConfig_neighbors_idx, currConfig_neighbors_cost, 
                                 prePickingPose_neighbors_idx, prePickingPose_neighbors_cost, 
                                 self.robot_p, self.workspace_p, req.armType)
@@ -366,7 +366,7 @@ class PybulletPlanScene(object):
                 print("The placing pose is legitimate. Proceed to planning for placing.")
         
             ################### plan the path to placing configuration ###################
-            placing_traj = self.planner_p.AstarPathFinding_new(currConfig, configToPlacingPose, 
+            placing_traj = self.planner_p.AstarPathFinding(currConfig, configToPlacingPose, 
                             pickingPose_neighbors_idx, pickingPose_neighbors_cost, 
                             placingPose_neighbors_idx, placingPose_neighbors_cost,
                             self.robot_p, self.workspace_p, req.armType)

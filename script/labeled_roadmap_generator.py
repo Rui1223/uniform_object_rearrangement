@@ -24,7 +24,7 @@ def main(args):
 
     ### generate samples
     pybullet_plan_scene.planner_p.generateSamples(
-        nsamples, pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p)
+        nsamples, pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "hybrid_space")
     
     ### Now generate object geometries on all position candidates
     pybullet_plan_scene.workspace_p.generateCandidatesGeometry_labeledRoadmap()
