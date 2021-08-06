@@ -5,6 +5,7 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <uniform_object_rearrangement/AstarPathFinding.h>
+#include <uniform_object_rearrangement/AstarPathFindingLabeled.h>
 
 #include "Graph.hpp"
 #include "AstarSolver.hpp"
@@ -47,12 +48,34 @@ public:
             m_astar_solver.prepareToSearch(m_right_torso_g);
             m_astar_solver.Astar_search(m_right_torso_g);
         }
-
         // let's return the response after a search
         resp.searchSuccess = m_astar_solver.getSearchSuccessInfo();
         resp.path = m_astar_solver.getPath();
         return true;
+    }
 
+    bool astarSolverLabeledCallback(
+        uniform_object_rearrangement::AstarPathFindingLabeled::Request &req,
+        uniform_object_rearrangement::AstarPathFindingLabeled::Response &resp) 
+    {
+        if (req.armType == "Right_torso"){
+            if (m_astar_solver.getQueryIdx() != req.query_idx) {
+                // this is a new query, let's set the new query
+                m_astar_solver.setPlanningQuery_labeled(m_right_torso_g, req.query_idx, 
+                    req.start_idx, req.goal_idx, req.start_config, req.goal_config,
+                    req.start_neighbors_idx, req.goal_neighbors_idx,
+                    req.start_neighbors_cost, req.goal_neighbors_cost,
+                    req.occupied_labels, req.isInHandManipulation, 
+                    req.violated_edges);
+            }
+            m_right_torso_g.modifyEdge(req.violated_edges, req.query_idx);
+            m_astar_solver.prepareToSearch(m_right_torso_g);
+            m_astar_solver.Astar_search_labeled(m_right_torso_g);
+        }
+        // let's return the response after a search
+        resp.searchSuccess = m_astar_solver.getSearchSuccessInfo();
+        resp.path = m_astar_solver.getPath();
+        return true;
     }
 
 };
@@ -77,7 +100,9 @@ int main(int argc, char** argv)
     std::cout << "time to load graph with " << planner.m_right_torso_g.getnNodes() << " nodes is " << t.elapsed() << "\n";
 
     // claim service the node provide (server)
-    ros::ServiceServer server = nh.advertiseService("astar_path_finding", &Planner_t::astarSolverCallback, &planner);
+    ros::ServiceServer astar_server = nh.advertiseService("astar_path_finding", &Planner_t::astarSolverCallback, &planner);
+    ros::ServiceServer astar_labeled_server = nh.advertiseService("astar_path_finding_labeled", &Planner_t::astarSolverLabeledCallback, &planner);
+
 
     // Loop at 2Hz until the node is shut down
     // ros::Rate rate(2);

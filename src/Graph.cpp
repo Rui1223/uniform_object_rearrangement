@@ -12,22 +12,22 @@ from the roadmap built in robotic scenarios.*/
 
 #include "Graph.hpp"
 
-Graph_t::Graph_t(std::string samples_file, std::string connections_file)
-{
-    // m_nNodes = nsamples;
-    specify_nodeStates(samples_file);
-    specify_neighborCosts(connections_file);
-    specify_edgeStatus();
-    // printStates();
-    // printNeighbors();
-    // printEdgeCosts();
-}
+// Graph_t::Graph_t(std::string samples_file, std::string connections_file)
+// {
+//     // m_nNodes = nsamples;
+//     specify_nodeStates(samples_file);
+//     specify_neighborCosts(connections_file);
+//     specify_edgeStatus();
+//     // printStates();
+//     // printNeighbors();
+//     // printEdgeCosts();
+// }
 
 void Graph_t::constructGraph(std::string samples_file, std::string connections_file)
 {
     // m_nNodes = nsamples;
     specify_nodeStates(samples_file);
-    specify_neighborCosts(connections_file);
+    specify_neighborCostsAndLabels(connections_file);
     specify_edgeStatus();
     // printStates();
     // printNeighbors();
@@ -86,7 +86,6 @@ void Graph_t::specify_neighborCosts(std::string connections_file)
         m_edgeCosts[temp_n2][temp_n1] = temp_cost;
     }
     m_inFile_.close();
-
 }
 
 void Graph_t::specify_nodeStates(std::string samples_file)
@@ -117,7 +116,67 @@ void Graph_t::specify_nodeStates(std::string samples_file)
     m_inFile_.close();
 
     m_nNodes = m_nodeStates.size();
+}
 
+void Graph_t::specify_neighborCostsAndLabels(std::string connections_file)
+{
+    int iter = 0;
+    // initialize m_nodeNeighbors, m_edgeCosts, 
+    // m_edgeLabels_arm, m_edgeInHandValidity, m_edgeLabels_objectInHand
+    while (iter != m_nNodes) {
+        m_nodeNeighbors.push_back(std::vector<int>());
+        m_edgeCosts.push_back(std::vector<float>(m_nNodes, std::numeric_limits<float>::max()));
+        m_edgeLabels_arm.push_back(std::vector<std::vector<int>>(m_nNodes, std::vector<int>()));
+        m_edgeInHandValidity.push_back(std::vector<bool>(m_nNodes, true));
+        m_edgeLabels_objectInHand.push_back(std::vector<std::vector<int>>(m_nNodes, std::vector<int>()));
+        iter++;
+    }
+    // read in the connection file
+    m_inFile_.open(connections_file);
+    // Check that the file was opened successfully
+    if (!m_inFile_)
+    {
+        std::cerr << "Unable to open the connections file\n";
+        exit(1); // call system to stop
+    }
+    std::string temp_str;
+    float c;
+    int temp_n1;
+    int temp_n2;
+    float temp_cost;
+    while (std::getline(m_inFile_, temp_str))
+    {
+        std::stringstream ss(temp_str);
+        // first read in the two node idx and the cost
+        ss >> temp_n1 >> temp_n2 >> temp_cost;
+        m_nodeNeighbors[temp_n1].push_back(temp_n2);
+        m_nodeNeighbors[temp_n2].push_back(temp_n1);
+        m_edgeCosts[temp_n1][temp_n2] = temp_cost;
+        m_edgeCosts[temp_n2][temp_n1] = temp_cost;
+        bool readSecondPartLabels = false;
+        while (ss >> c) {
+            // check if the value is negative
+            if (c < 0) {
+                // this is for m_edgeInHandValidity
+                if (c == -2) {
+                    m_edgeInHandValidity[temp_n1][temp_n2] = false;
+                    m_edgeInHandValidity[temp_n2][temp_n1] = false;
+                }
+                readSecondPartLabels = true;
+            }
+            if (c >= 0 && readSecondPartLabels) {
+                // this is for m_edgeLabels_objectInHand
+                m_edgeLabels_objectInHand[temp_n1][temp_n2].push_back(c);
+                m_edgeLabels_objectInHand[temp_n2][temp_n1].push_back(c);
+            }
+            if (c >= 0 && !readSecondPartLabels) {
+                // this is for m_edgeLabels_arm
+                m_edgeLabels_arm[temp_n1][temp_n2].push_back(c);
+                m_edgeLabels_arm[temp_n2][temp_n1].push_back(c);
+            }
+        }
+    } 
+    m_inFile_.close();
 }
 
 
@@ -163,6 +222,33 @@ void Graph_t::printEdgeCosts()
     }
 }
 
+void Graph_t::printEdgeLabelsArm_specific(int id1, int id2)
+{   
+    std::cout << "checking the edge: " << id1 << "\t" << id2 << "\n";
+    std::vector<int> temp_edgelabelsArm = getEdgeLabelsArm(id1, id2);
+    for (int i = 0; i < temp_edgelabelsArm.size(); i++) {
+        std::cout << temp_edgelabelsArm[i] << " ";
+    }
+    std::cout << "\n";
+}
+
+void Graph_t::printEdgeLabelsInHand_specific(int id1, int id2)
+{   
+    std::cout << "checking the edge: " << id1 << "\t" << id2 << "\n";
+    std::vector<int> temp_edgelabelsInHand = getEdgeLabelsInHand(id1, id2);
+    for (int i = 0; i < temp_edgelabelsInHand.size(); i++) {
+        std::cout << temp_edgelabelsInHand[i] << " ";
+    }
+    std::cout << "\n";
+}
+
+
+void Graph_t::printEdgeInHandValidity_specific(int id1, int id2)
+{   
+    std::cout << "checking the edge: " << id1 << "\t" << id2 << "\n";
+    std::cout << getEdgeInHandValidity(id1, id2);
+    std::cout << "\n";
+}
 
 
 // void Graph_t::connectStartAndGoal(std::string task_file)

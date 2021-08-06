@@ -4,3 +4,4 @@
 int32 object_idx
 ---
 geometry_msgs/Point curr_position
+int32 curr_position_idx

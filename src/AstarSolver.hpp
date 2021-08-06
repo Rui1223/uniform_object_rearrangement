@@ -76,6 +76,9 @@ class AstarSolver_t
     std::vector<int> m_goal_neighbors_idx;
     std::vector<float> m_start_neighbors_cost;
     std::vector<float> m_goal_neighbors_cost;
+    // related to labels
+    std::vector<int> m_occupied_labels;
+    bool m_isInHandManipulation;
 
 public:
     // Constructor
@@ -90,8 +93,19 @@ public:
             std::vector<float> start_neighbors_cost, std::vector<float> goal_neighbors_cost,
             std::vector<uniform_object_rearrangement::Edge> violated_edges
             );
+
+    void setPlanningQuery_labeled(Graph_t &g, int query_idx, 
+        int start_idx, int goal_idx, std::vector<float> start_config, std::vector<float> goal_config,
+        std::vector<int> start_neighbors_idx, std::vector<int> goal_neighbors_idx,
+        std::vector<float> start_neighbors_cost, std::vector<float> goal_neighbors_cost,
+        std::vector<int> occupied_labels, bool isInHandManipulation, 
+        std::vector<uniform_object_rearrangement::Edge> violated_edges
+        );
+
     void prepareToSearch(Graph_t &g);
     void Astar_search(Graph_t &g);
+    void Astar_search_labeled(Graph_t &g);
+    bool checkEdgeCarryOccupiedLabels(const std::vector<int> &edgeLabels);
 
     void clearOpenAndCLosedList();
     void computeH(Graph_t &g);

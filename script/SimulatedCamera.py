@@ -72,7 +72,7 @@ class SimulatedCamera(object):
         ### create a folder to store all the images generated from the current scene
         ### input -> scene_index
         ### output -> rgbImg_path, depthImg_path, segmentationImg_path, data_path (self member)
-        # self.img_path = "/home/rui/Documents/research/motoman_ws/src/pybullet_motoman/src/sensor_images/" + self.scene_index
+        # self.img_path = "/home/rui/Documents/research/motoman_ws/src/uniform_object_rearrangement/sensor_images/" + self.scene_index
         rospack = rospkg.RosPack()
         self.img_path = os.path.join(rospack.get_path("uniform_object_rearrangement"), "sensor_images", self.scene_index)
         self.rgbImg_path = self.img_path + "/rgb"

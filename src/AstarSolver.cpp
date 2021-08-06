@@ -49,6 +49,36 @@ void AstarSolver_t::setPlanningQuery(Graph_t &g, int query_idx,
     // computeH(g); // heuristics
 }
 
+void AstarSolver_t::setPlanningQuery_labeled(Graph_t &g, int query_idx, 
+        int start_idx, int goal_idx, std::vector<float> start_config, std::vector<float> goal_config,
+        std::vector<int> start_neighbors_idx, std::vector<int> goal_neighbors_idx,
+        std::vector<float> start_neighbors_cost, std::vector<float> goal_neighbors_cost,
+        std::vector<int> occupied_labels, bool isInHandManipulation, 
+        std::vector<uniform_object_rearrangement::Edge> violated_edges
+        )
+{
+    // get the query info
+    m_query_idx = query_idx;
+    m_start = start_idx;
+    m_goal = goal_idx;
+    m_startState = start_config;
+    m_goalState = goal_config;
+    m_start_neighbors_idx = start_neighbors_idx;
+    m_goal_neighbors_idx = goal_neighbors_idx;
+    m_start_neighbors_cost = start_neighbors_cost;
+    m_goal_neighbors_cost = goal_neighbors_cost;
+
+    // related to labels
+    m_occupied_labels = occupied_labels;
+    m_isInHandManipulation = isInHandManipulation;
+
+    // given the goal, compute the heuristics
+    // m_H = std::vector<float>(g.getnNodes()+2, 0.0);
+    // computeH(g); // heuristics
+}
+
+
+
 void AstarSolver_t::prepareToSearch(Graph_t &g)
 {
     m_G = std::vector<float>(g.getnNodes()+2, std::numeric_limits<float>::max());
@@ -181,6 +211,81 @@ void AstarSolver_t::Astar_search(Graph_t &g)
     std::cout << "The problem is not solvable. Search failed...\n\n";
     m_isSearchSuccess = false;
     return;
+}
+
+void AstarSolver_t::Astar_search_labeled(Graph_t &g)
+{
+    while (!m_open.empty()){
+        AstarNode_t *current = m_open.top();
+        m_open.pop();
+        // Now check if the current node has been expanded
+        if (m_expanded[current->m_id] == true) {
+            // This node has been expanded with the lowest f value for its id
+            // No need to put it into the closed list
+            delete current;
+            continue;
+        }
+        // std::cout << current->m_id << "\n";
+        m_closed.push_back(current);
+        m_expanded[current->m_id] = true;
+
+        if (current->m_id == m_goal) {
+            // the goal is found
+            std::cout << "PATH FOUND\n";
+            m_pathCost = current->m_g;
+            back_track_path(); // construct your path
+            // pathToTrajectory(g); // get the trajectory (a sequence of configurations)
+
+            return;
+        }
+        // get neighbors of the current node
+        std::vector<int> neighbors = g.getNodeNeighbors(current->m_id);
+        for (auto const &neighbor : neighbors)
+        {   
+            // check if the edge is still valid or not
+            if ( g.getEdgeStatus(current->m_id, neighbor) == m_query_idx ) {continue;} 
+            if ( checkEdgeCarryOccupiedLabels(g.getEdgeLabelsArm(current->m_id, neighbor)) == true ) { continue; }
+            if ( m_isInHandManipulation ) {
+                if ( g.getEdgeInHandValidity(current->m_id, neighbor) != m_isInHandManipulation ) { continue; }
+                if ( checkEdgeCarryOccupiedLabels(g.getEdgeLabelsInHand(current->m_id, neighbor)) == true ) { continue; }
+            }
+            // check if the neighbor node has been visited or extended before
+            if ( m_expanded[neighbor] ) {continue;}
+            if ( m_G[neighbor] > m_G[current->m_id] + g.getEdgeCost(current->m_id, neighbor) )
+            {
+                m_G[neighbor] = m_G[current->m_id] + g.getEdgeCost(current->m_id, neighbor);
+                m_open.push(new AstarNode_t(neighbor, m_G[neighbor], current));
+            }
+        }
+        // Consider one more case here! The goal may also be the neighbor
+        auto it = std::find(m_goal_neighbors_idx.begin(), m_goal_neighbors_idx.end(), current->m_id);
+        if (it != m_goal_neighbors_idx.end()) {
+            // the goal is a neighbor of the current node
+            int index = it - m_goal_neighbors_idx.begin();
+            if ( m_G[m_goal] > m_G[current->m_id] + m_goal_neighbors_cost[index] ) {
+                m_G[m_goal] = m_G[current->m_id] + m_goal_neighbors_cost[index];
+                m_open.push(new AstarNode_t(m_goal, m_G[m_goal], current));
+            }
+        }
+    }
+    // You are reaching here since the open list is empty and the goal is not found
+    std::cout << "The problem is not solvable. Search failed...\n\n";
+    m_isSearchSuccess = false;
+    return;
+}
+
+bool AstarSolver_t::checkEdgeCarryOccupiedLabels(const std::vector<int> &edgeLabels)
+{
+    // this function checks if any of the elements in m_occupied_labels
+    // appears in the edge labels
+    bool isEdgeCarryOccupiedLabels = true;
+    for (auto const &occupied_label : m_occupied_labels) {
+        if (std::find(edgeLabels.begin(), edgeLabels.end(), occupied_label) != edgeLabels.end()) {
+            return isEdgeCarryOccupiedLabels;
+        }
+    }
+    // congrats, the edge does not carry any of the occupied labels
+    return false;
 }
 
 void AstarSolver_t::back_track_path()

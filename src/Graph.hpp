@@ -21,6 +21,11 @@ class Graph_t
     std::vector<std::vector<float>> m_nodeStates;
     std::vector<std::vector<int>> m_edgeStatus;
 
+    // labeled graph version (additional member)
+    std::vector<std::vector<std::vector<int>>> m_edgeLabels_arm;
+    std::vector<std::vector<bool>> m_edgeInHandValidity;
+    std::vector<std::vector<std::vector<int>>> m_edgeLabels_objectInHand;
+
     // // specify start and goal
     // int m_start;
     // std::vector<float> m_startNode;
@@ -34,10 +39,11 @@ class Graph_t
 public:
     // constructor
     Graph_t() {}
-    Graph_t(std::string samples_file, std::string connections_file);
+    // Graph_t(std::string samples_file, std::string connections_file);
     void constructGraph(std::string samples_file, std::string connections_file);
     void specify_nodeStates(std::string samples_file);
     void specify_neighborCosts(std::string connections_file);
+    void specify_neighborCostsAndLabels(std::string connections_file);
     void specify_edgeStatus();
     // void connectStartAndGoal(std::string task_file);
     float computeDist(std::vector<float> n1, std::vector<float> n2);
@@ -52,12 +58,18 @@ public:
     std::vector<int> getNodeNeighbors(int id) { return m_nodeNeighbors[id]; }
     float getEdgeCost(int id1, int id2) { return m_edgeCosts[id1][id2]; }
     int getEdgeStatus(int id1, int id2) { return m_edgeStatus[id1][id2]; }
+    std::vector<int> getEdgeLabelsArm(int id1, int id2) { return m_edgeLabels_arm[id1][id2]; }
+    std::vector<int> getEdgeLabelsInHand(int id1, int id2) { return m_edgeLabels_objectInHand[id1][id2]; }
+    bool getEdgeInHandValidity(int id1, int id2) { return m_edgeInHandValidity[id1][id2]; }
     void modifyEdge(std::vector<uniform_object_rearrangement::Edge> &violated_edges, int query_idx);
 
     // printer
     void printStates();
     void printNeighbors();
     void printEdgeCosts();
+    void printEdgeLabelsArm_specific(int id1, int id2);
+    void printEdgeLabelsInHand_specific(int id1, int id2);
+    void printEdgeInHandValidity_specific(int id1, int id2);
 
     // destructor
     ~Graph_t() {}

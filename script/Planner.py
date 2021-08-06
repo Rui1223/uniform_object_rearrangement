@@ -21,8 +21,9 @@ from CollisionChecker import CollisionChecker
 
 import rospy
 from rospkg import RosPack
-from pybullet_motoman.srv import AstarPathFinding, AstarPathFindingRequest
-from pybullet_motoman.msg import Edge
+from uniform_object_rearrangement.srv import AstarPathFinding, AstarPathFindingRequest
+from uniform_object_rearrangement.srv import AstarPathFindingLabeled, AstarPathFindingLabeledRequest
+from uniform_object_rearrangement.msg import Edge
 
 class Planner(object):
     def __init__(self, rosPackagePath, server,
@@ -1574,3 +1575,112 @@ class Planner(object):
         ### Then check if there is collision (robot self-collision + robot-knownGEO)
         isConfigValid, FLAG = self.checkConfig_CollisionWithRobotAndKnownGEO(robot, workspace)
         return isConfigValid, FLAG
+
+    def AstarPathFinding_labeledVersion(self, initialConfig, targetConfig,
+                start_neighbors_idx, start_neighbors_cost, 
+                goal_neighbors_idx, goal_neighbors_cost,
+                robot, workspace, armType):
+        ### Input: initialConfig, targetConfig [q1, q2, ..., q7]
+        ###        neighbors_idx as well as neighbors_cost should not be empty when entering in this function
+        ### Output: traj (format: [joint_state1, joint_state2, ...])
+        ###         and joint_state is a list of joint values
+
+        result_traj = [] ### the output we want to construct
+        isPathValid = False
+        print("current planning query: ", self.query_idx)
+        violated_edges = [] ### initially there are no violated edges
+
+        ### for path finding on a labeled roadmap, we need to know what labels
+        ### are being occupied by the current arrangement
+        occupied_labels = []
+        if armType == "Right_torso":
+            for obj_idx, obj_info in workspace.object_geometries.items():
+                if (obj_idx != self.objectInRightHand_idx):
+                    occupied_labels.append(obj_info.curr_position_idx)
+            if self.objectInRightHand_idx == -1:
+                isInHandManipulation = False
+            else:
+                isInHandManipulation = True
+
+        counter = 0
+        while (isPathValid == False):
+            counter += 1
+            ### trigger new call within the same query idx
+            # start_time = time.time()
+            searchSuccess, path =  self.serviceCall_astarPathFinding_labeledVersion(
+                    violated_edges, initialConfig, targetConfig, 
+                    start_neighbors_idx, goal_neighbors_idx,
+                    start_neighbors_cost, goal_neighbors_cost,
+                    occupied_labels, isInHandManipulation, 
+                    robot, workspace, armType)
+            # print("Time for service call for astarPathFinding: {}".format(time.time() - start_time))
+            if searchSuccess == False:
+                print("the plan fails at the " + str(counter) + "th trial...")
+                ### the plan fails, could not find a solution
+                self.query_idx += 1
+                return result_traj ### an empty trajectory
+            ### otherwise, we need collision check and smoothing (len(path) >= 3)
+            # start_time = time.time()
+            smoothed_path, isPathValid, violated_edges = self.smoothPath(
+                    path, initialConfig, targetConfig, robot, workspace, armType)
+            # print("Time for smooth the path: {}".format(time.time() - start_time))            
+
+        ### congrats, the path is valid and finally smoothed, let's generate trajectory
+        print("smoothed path: ", smoothed_path)
+        print("\n")
+        ### directly generate trajectory based on the new path
+        for i in range(0, len(smoothed_path)-1):
+            if i == 0:
+                config1 = initialConfig
+            else:
+                config1 = self.nodes[armType][smoothed_path[i]]
+            if i == (len(smoothed_path)-2):
+                config2 = targetConfig
+            else:
+                config2 = self.nodes[armType][smoothed_path[i+1]]
+            ### get edge trajectory
+            config_edge_traj = self.generateTrajectory_DirectConfigPath(config1, config2, robot, armType, workspace)
+            # result_traj.append(config_edge_traj)
+            result_traj += config_edge_traj
+
+        ### before you claim the victory of this query, increment the planning query
+        ### so as to tell people this query is over, next time is a new query
+        self.query_idx += 1
+
+        return result_traj
+
+    def serviceCall_astarPathFinding_labeledVersion(self, 
+            violated_edges, initialConfig, targetConfig, 
+            start_neighbors_idx, goal_neighbors_idx, start_neighbors_cost, goal_neighbors_cost,
+            occupied_labels, isInHandManipulation, 
+            robot, workspace, armType):
+        ### violated_edges: [Edge(), Edge(), ...]
+        ### prepare the astarPathFindingRequest
+        rospy.wait_for_service("astar_path_finding_labeled")
+        request = AstarPathFindingLabeledRequest()
+        request.query_idx = self.query_idx
+        request.start_idx = self.nsamples
+        request.goal_idx = self.nsamples + 1
+        request.start_config = initialConfig
+        request.goal_config = targetConfig
+        request.violated_edges = violated_edges
+        request.armType = armType
+        request.start_neighbors_idx = start_neighbors_idx
+        request.goal_neighbors_idx = goal_neighbors_idx
+        request.start_neighbors_cost = start_neighbors_cost
+        request.goal_neighbors_cost = goal_neighbors_cost
+        request.occupied_labels = occupied_labels
+        request.isInHandManipulation = isInHandManipulation
+
+        try:
+            astarSearchLabeled = rospy.ServiceProxy("astar_path_finding_labeled", AstarPathFindingLabeled)
+            response = astarSearchLabeled(request.query_idx, 
+                request.start_idx, request.goal_idx,
+                request.start_config, request.goal_config,
+                request.start_neighbors_idx, request.goal_neighbors_idx,
+                request.start_neighbors_cost, request.goal_neighbors_cost,
+                request.occupied_labels, request.isInHandManipulation, 
+                request.violated_edges, request.armType)
+            return response.searchSuccess, list(response.path)
+        except rospy.ServiceException as e:
+            print("Service call failed: %s" % e)

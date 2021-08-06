@@ -36,14 +36,19 @@ class WorkspaceTable(object):
         self.collisionAgent = CollisionChecker(self.server)
 
         ### RED, GREEN, BLUE, YELLOW, MAGENTA,
-        ### ORANGE, BROWN, BLACK, GRAY,
+        ### ORANGE, BROWN, BLACK, GREY,
         ### CYAN, PURPLE, LIME,
-        ### MAROON, OLIVE, TEAL, NAVY (16 colors up to 16 objects)
+        ### MAROON, OLIVE, TEAL, NAVY,
+        ### PINK, APRICOT, BEIGE,
+        ### MINT, LAVENDER
+        ### (21 colors up to 21 objects)
 
         self.color_pools = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1],
                         [0.96, 0.51, 0.19], [0.604, 0.388, 0.141], [0, 0, 0], [0.66, 0.66, 0.66],
                         [0.259, 0.831, 0.957], [0.567, 0.118, 0.706], [0.749, 0.937, 0.271],
-                        [0.502, 0, 0], [0.502, 0.502, 0], [0.275, 0.6, 0.565], [0, 0, 0.459]]
+                        [0.502, 0, 0], [0.502, 0.502, 0], [0.275, 0.6, 0.565], [0, 0, 0.459],
+                        [0.98, 0.745, 0.831], [1.0, 0.847, 0.694], [1.0, 0.98, 0.784],
+                        [0.667, 1.0, 0.765], [0.863, 0.745, 1.0]]
 
     def createRobotStandingBase(self, robotBasePosition, standingBase_dim, isPhysicsTurnOn):
         ################ create the known geometries - standingBase  ####################
@@ -227,7 +232,7 @@ class WorkspaceTable(object):
                 ### assign the start position to the closest candidate position
                 start_position_idx = self.assignToNearestCandiate(start_pos)
                 self.object_geometries[obj_i] = CylinderObject(
-                            obj_i, start_pos, start_position_idx, True, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
+                            obj_i, start_pos, start_position_idx, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
 
         ### assign goal positions
         self.assignGoalPositions()
@@ -248,9 +253,11 @@ class WorkspaceTable(object):
             print(obj_idx)
             f_instance.write(str(obj_idx) + "\n")
             print(self.object_geometries[obj_idx].curr_pos)
+            print(self.object_geometries[obj_idx].curr_position_idx)
             temp_curr_pos = self.object_geometries[obj_idx].curr_pos
             f_instance.write(str(temp_curr_pos[0]) + " " + str(temp_curr_pos[1]) + " " + str(temp_curr_pos[2]) + "\n")
             print(self.object_geometries[obj_idx].goal_pos)
+            print(self.object_geometries[obj_idx].goal_position_idx)
             print(self.object_geometries[obj_idx].rgbacolor)
         ###########################################
         f_instance.close()
@@ -274,7 +281,6 @@ class WorkspaceTable(object):
             cylinder_curr_position_idx = cylinder_obj.curr_position_idx
             cylinder_goal_position = [cylinder_obj.goal_position.x, cylinder_obj.goal_position.y, cylinder_obj.goal_position.z]
             cylinder_goal_position_idx = cylinder_obj.goal_position_idx
-            cylinder_isAtStart = cylinder_obj.isAtStart
             cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
                 radius=cylinder_radius, height=cylinder_height, physicsClientId=self.server)
             cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
@@ -282,7 +288,7 @@ class WorkspaceTable(object):
             cylinder_objectM = p.createMultiBody(baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v,
                 basePosition=cylinder_curr_position, physicsClientId=self.server)
             self.object_geometries[cylinder_obj.obj_idx] = CylinderObject(
-                cylinder_obj.obj_idx, cylinder_curr_position, cylinder_curr_position_idx, cylinder_isAtStart, 
+                cylinder_obj.obj_idx, cylinder_curr_position, cylinder_curr_position_idx, 
                 cylinder_objectM, cylinder_obj.radius, cylinder_obj.height, cylinder_rgbacolor)
             self.object_geometries[cylinder_obj.obj_idx].setGoalPosition(cylinder_goal_position, cylinder_goal_position_idx)
         
@@ -303,7 +309,6 @@ class WorkspaceTable(object):
             cylinder_object.goal_position.y = self.object_geometries[obj_i].goal_pos[1]
             cylinder_object.goal_position.z = self.object_geometries[obj_i].goal_pos[2]
             cylinder_object.goal_position_idx = self.object_geometries[obj_i].goal_position_idx
-            cylinder_object.isAtStart = self.object_geometries[obj_i].isAtStart
             cylinder_object.radius = self.cylinder_radius
             cylinder_object.height = self.cylinder_height
             cylinder_object.rgbacolor.r = self.object_geometries[obj_i].rgbacolor[0]
@@ -341,7 +346,7 @@ class WorkspaceTable(object):
                     basePosition=start_pos, physicsClientId=self.server)
                 start_position_idx = self.assignToNearestCandiate(start_pos)
                 self.object_geometries[obj_idx] = CylinderObject(
-                    obj_idx, start_pos, start_position_idx, True, cylinder_objectM_start, \
+                    obj_idx, start_pos, start_position_idx, cylinder_objectM_start, \
                         self.cylinder_radius, self.cylinder_height, object_rgbacolor_start)
                 self.num_objects += 1
             ### before the next loop
@@ -365,7 +370,9 @@ class WorkspaceTable(object):
         for obj_idx in range(self.num_objects):
             print(obj_idx)
             print(self.object_geometries[obj_idx].curr_pos)
+            print(self.object_geometries[obj_idx].curr_position_idx)
             print(self.object_geometries[obj_idx].goal_pos)
+            print(self.object_geometries[obj_idx].goal_position_idx)
             print(self.object_geometries[obj_idx].rgbacolor)
         ###########################################
         return True
@@ -465,11 +472,12 @@ class WorkspaceTable(object):
         return nearest_candidate_idx
 
 
-    def updateObjectMesh(self, obj_idx, position, orientation=[0, 0, 0, 1]):
+    def updateObjectMesh(self, obj_idx, position, position_idx, orientation=[0, 0, 0, 1]):
         ### input - target_pose: [x, y, z]
         p.resetBasePositionAndOrientation(
             self.object_geometries[obj_idx].geo, position, orientation, physicsClientId=self.server)
         self.object_geometries[obj_idx].curr_pos = position
+        self.object_geometries[obj_idx].curr_position_idx = position_idx
 
     
     def generateCandidatesGeometry_labeledRoadmap(self):
@@ -484,7 +492,7 @@ class WorkspaceTable(object):
             cylinder_objectM = p.createMultiBody(
                 baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v, basePosition=candidate_pos, physicsClientId=self.server)
             self.object_geometries[candidate_idx] = CylinderObject(
-                candidate_idx, candidate_pos, candidate_idx, True, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
+                candidate_idx, candidate_pos, candidate_idx, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
         ### printing test
         # for candidate_idx, cylinder_object in self.object_geometries.items():
         #     print(str(candidate_idx) + ": " + str(cylinder_object.curr_pos))
@@ -498,14 +506,13 @@ class AnyObject(object):
         self.geo = geo
 
     def setPos(pos):
-        self.pos = pos
+        self.curr_pos = curr_pos
     
 class CylinderObject(AnyObject):
-    def __init__(self, index, curr_pos, curr_position_idx, isAtStart, geo, cylinder_radius, cylinder_height, rgbacolor):
+    def __init__(self, index, curr_pos, curr_position_idx, geo, cylinder_radius, cylinder_height, rgbacolor):
         ### invoking the __init__ of the parent class
         AnyObject.__init__(self, index, curr_pos, geo)
         self.curr_position_idx = curr_position_idx
-        self.isAtStart = isAtStart
         self.cylinder_radius = cylinder_radius
         self.cylinder_height = cylinder_height
         self.rgbacolor = rgbacolor

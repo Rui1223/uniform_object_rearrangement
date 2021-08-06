@@ -3,6 +3,7 @@
 
 int32 object_idx
 string armType
+bool isLabeledRoadmapUsed
 ---
 bool success
 uniform_object_rearrangement/ObjectRearrangePath path
