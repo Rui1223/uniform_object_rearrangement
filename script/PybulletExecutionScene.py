@@ -143,7 +143,7 @@ class PybulletExecutionScene(object):
         ### given the request data: num_objects (int32)
         rospy.logwarn("GENERATE REARRANGEMENT INSTANCE")
         if req.isNewInstance:
-            success = self.workspace_e.generateInstance_cylinders(req.num_objects, req.instance_number)
+            success = self.workspace_e.generateInstance_cylinders(req.num_objects)
         else:
             success = self.workspace_e.loadInstance_cylinders(req.num_objects, req.instance_number)
         

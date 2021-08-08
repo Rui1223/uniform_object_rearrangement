@@ -9,74 +9,65 @@ import numpy as np
 import rospy
 import rospkg
 
-from uniform_object_rearrangement.msg import CylinderObj
-from uniform_object_rearrangement.msg import ObjectRearrangePath
-from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderRequest
-from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
-from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
-from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectRequest
-from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
-from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
+from geometry_msgs.msg import Point
+from sensor_msgs.msg import JointState
 
-############################### description ################################
-### This class defines a RearrangementTaskPlanner class which
-### solves an rearrangement problems with the number of the object specified
-### It
-### (1) asks the execution scene to generate an instance
-### (2) asks the pose estimator to get the object poses
-### (3) reproduces the instance in task planner and solve it with our planner
-### (4) asks the planning scene to plan the manipulation paths
-### (5) asks the execution scene to execute the planned paths
-#############################################################################
+from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectRequest
+from uniform_object_rearrangement.srv import GetCertainObjectPose, GetCertainObjectPoseRequest
+from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotConfigRequest
+from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseRequest
+from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigRequest
+from uniform_object_rearrangement.srv import UpdateManipulationStatus, UpdateManipulationStatusRequest
 
 class RearrangementTaskPlanner(object):
-
-    def __init__(self, args):
+    def __init__(self):
         ### set the rospkg path
+        rospy.logwarn("INITIALIZE A REARRANGEMENT TASK PLANNER")
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
-        self.num_objects = int(args[1])
 
-    def serviceCall_generateInstanceCylinder(self):
-        rospy.wait_for_service("generate_instance_cylinder")
-        request = GenerateInstanceCylinderRequest()
-        request.num_objects = self.num_objects
+    def setPlanningParams(self, nums_objects, isLabeledRoadmapUsed=True):
+        self.num_objects = nums_objects
+        self.all_objects = [i for i in range(self.num_objects)]
+        self.object_ordering = [] ### a list of obj_idx
+        self.object_paths = [] ### a list of ObjectRearrangePath paths
+        self.time_threshold = 180 ### 180s
+        self.planning_startTime = time.time()
+        self.isLabeledRoadmapUsed = isLabeledRoadmapUsed
+
+    def serviceCall_getCertainObjectPose(self, obj_idx):
+        '''call the GetCertainObjectPose service to get the object pose from planning '''
+        rospy.wait_for_service("get_certain_object_pose")
+        request = GetCertainObjectPoseRequest()
+        request.object_idx = obj_idx
         try:
-            generateInstanceCylinder_proxy = rospy.ServiceProxy(
-                        "generate_instance_cylinder", GenerateInstanceCylinder)
-            success = generateInstanceCylinder_proxy(request.num_objects)
-            return success.success
+            getObjectPose_proxy = rospy.ServiceProxy("get_certain_object_pose", GetCertainObjectPose)
+            getObjectPose_response = getObjectPose_proxy(request.object_idx)
+            object_curr_pos = [getObjectPose_response.curr_position.x, \
+                getObjectPose_response.curr_position.y, getObjectPose_response.curr_position.z]
+            object_curr_position_idx = getObjectPose_response.curr_position_idx
+            return object_curr_pos, object_curr_position_idx
         except rospy.ServiceException as e:
-            print("generate_instance_cylinder service call failed: %s" % e)
+            print("get_certain_object_pose service call failed: %s" % e)
 
-    def serviceCall_reproduceInstanceCylinder(self, cylinder_objects):
-        ### Input: cylinder_objects (CylinderObj[])
-        rospy.wait_for_service("reproduce_instance_cylinder")
-        request = ReproduceInstanceCylinderRequest(cylinder_objects)
+    def serviceCall_getCurrRobotConfig(self):
+        '''call the GetCurrRobotConfig service to get the robot current config from planning
+           expect output: configuration of all controllable joints (1 + 7 + 7 + 6) '''
+        rospy.wait_for_service("get_curr_robot_config")
+        request = GetCurrRobotConfigRequest()
         try:
-            reproduceInstanceCylinder_proxy = rospy.ServiceProxy(
-                "reproduce_instance_cylinder", ReproduceInstanceCylinder)
-            success = reproduceInstanceCylinder_proxy(request.cylinder_objects)
-            return success.success
+            getCurrRobotConfig_proxy = rospy.ServiceProxy("get_curr_robot_config", GetCurrRobotConfig)
+            getCurrRobotConfig_response = getCurrRobotConfig_proxy(request)
+            return getCurrRobotConfig_response.robot_config.position
         except rospy.ServiceException as e:
-            print("reproduce_instance_cylinder service call failed: %s" % e)        
+            print("get_curr_robot_config service call failed: %s" % e)
 
-    def serviceCall_cylinderPositionEstimate(self):
-        rospy.wait_for_service("cylinder_position_estimate")
-        request = CylinderPositionEstimateRequest()
-        try:
-            cylinderPositionEstimate_proxy = rospy.ServiceProxy(
-                "cylinder_position_estimate", CylinderPositionEstimate)
-            cylinder_position_estimate_response = cylinderPositionEstimate_proxy(request)
-            return cylinder_position_estimate_response.cylinder_objects
-        except rospy.ServiceException as e:
-            print("cylinder_position_estimate service call failed: %s" % e)
-
-    def serviceCall_rearrangeCylinderObject(self, obj_idx, armType):
+    def serviceCall_rearrangeCylinderObject(self, obj_idx, armType, isLabeledRoadmapUsed=True):
         rospy.wait_for_service("rearrange_cylinder_object")
         request = RearrangeCylinderObjectRequest()
         request.object_idx = obj_idx
         request.armType = armType
+        request.isLabeledRoadmapUsed = isLabeledRoadmapUsed
         try:
             rearrangeCylinderObject_proxy = rospy.ServiceProxy(
                 "rearrange_cylinder_object", RearrangeCylinderObject)
@@ -85,125 +76,182 @@ class RearrangementTaskPlanner(object):
         except rospy.ServiceException as e:
             print("rearrange_cylinder_object service call failed: %s" % e)
 
-    def serviceCall_execute_trajectory(self, traj):
-        '''call the ExecuteTrajectory service to execute the given trajectory
-        inputs
-        ======
-            traj (an ArmTrajectory object): the trajectory to execute
-        outputs
-        =======
-            success: indicator of whether the trajectory is executed successfully
-        '''
-        rospy.wait_for_service("execute_trajectory")
-        request = ExecuteTrajectoryRequest()
-        request.arm_trajectory = traj
+    def serviceCall_updateCertainObjectPose(self, obj_idx, target_pose, target_position_idx):
+        '''call the UpdateCertainObjectPose service to update the object
+           to the specified target pose'''
+        rospy.wait_for_service("update_certain_object_pose")
+        request = UpdateCertainObjectPoseRequest()
+        request.object_idx = obj_idx
+        request.target_pose = Point(target_pose[0], target_pose[1], target_pose[2])
+        request.object_position_idx = target_position_idx
         try:
-            executeTraj_proxy = rospy.ServiceProxy("execute_trajectory", ExecuteTrajectory)
-            executeTraj_response = executeTraj_proxy(request.arm_trajectory)
-            return executeTraj_response.success
+            updateCertainObjectPose_proxy = rospy.ServiceProxy(
+                                            "update_certain_object_pose", UpdateCertainObjectPose)
+            updateCertainObjectPose_response = updateCertainObjectPose_proxy(
+                                request.object_idx, request.target_pose, request.object_position_idx)
+            return updateCertainObjectPose_response.success
         except rospy.ServiceException as e:
-            print(" execute_trajectory service call failed: %s" % e)
+            print("update_certain_object_pose service call failed: %s" % e)
 
-    def serviceCall_attach_object(self, attach, object_idx, armType):
-        """call the AttachObject service to attach/detach the corresponding object
-        inputs
-        ======
-            attach (bool): indicate the action of attach or detach
-            object_idx (int): the object to attach or detach
-            armType (string): "Left"/"Right"/"Left_torso"/"Right_torso"
-        outputs
-        =======
-            success: indicator of whether the attach/detach command is fulfilled
-        """
-        rospy.wait_for_service("attach_object")
-        request = AttachObjectRequest()
-        request.attach = attach
-        request.object_idx = object_idx
+    def serviceCall_resetRobotCurrConfig(self, robot_curr_config):
+        '''call the ResetRobotCurrConfig service to reset the robot
+           to the specified configuration'''
+        rospy.wait_for_service("reset_robot_curr_config")
+        request = ResetRobotCurrConfigRequest()
+        request.robot_config = JointState()
+        request.robot_config.position = robot_curr_config
+        try:
+            resetRobotCurrConfig_proxy = rospy.ServiceProxy("reset_robot_curr_config", ResetRobotCurrConfig)
+            resetRobotCurrConfig_response = resetRobotCurrConfig_proxy(request.robot_config)
+            return resetRobotCurrConfig_response.success
+        except rospy.ServiceException as e:
+            print("reset_robot_curr_config service call failed: %s" % e)
+    
+    def serviceCall_updateManipulationStatus(self, armType):
+        '''call the UpdateManipulationStatus service to disable
+           any relationship between the robot and the object'''
+        rospy.wait_for_service("update_manipulation_status")
+        request = UpdateManipulationStatusRequest()
         request.armType = armType
         try:
-            attachObject_proxy = rospy.ServiceProxy("attach_object", AttachObject)
-            attachObject_response = attachObject_proxy(request.attach, request.object_idx, request.armType)
-            return attachObject_response.success
+            updateManipulationStatus_proxy = rospy.ServiceProxy("update_manipulation_status", UpdateManipulationStatus)
+            updateManipulationStatus_response = updateManipulationStatus_proxy(request.armType)
+            return updateManipulationStatus_response.success
         except rospy.ServiceException as e:
-            print(" attach_object service call failed: %s" % e)
-        
+            print("update_manipulation_status service call failed: %s" % e)
 
-    def executeWholePlan(self, whole_path):
-        """ call the ExecuteTrajectory service to execute each trajectory in the path
-            also tell the robot to attach or detach the object among the motions 
-            inputs
-            ======
-                whole path (a list of ObjectRearrangementPath): a sequence of object paths
-            outputs
-            =======
-                execute_success (bool): indicate whether success or not
-        """
-        for path in whole_path:
-            ### first execute the transit trajectory in the path
-            execute_success = self.serviceCall_execute_trajectory(path.transit_trajectory)
-            ### now attach the object
-            attach_success = self.serviceCall_attach_object(
-                attach=True, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
-            ### then execute the transfer trajectory in the path
-            execute_success = self.serviceCall_execute_trajectory(path.transfer_trajectory)
-            ### now detach the object
-            attach_success = self.serviceCall_attach_object(
-                attach=False, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
-            ### finally execute the finish trajectory in the path
-            execute_success = self.serviceCall_execute_trajectory(path.finish_trajectory)
+    def DFS(self):
+        '''search for the remaining object ordering based on current object ordering'''
+        ### (1) update self.object_ordering and self.paths (a list of ObjectRearrangePath paths)
+        ### (2) return FLAG==true if the problem is solved by mRS (an indication of monotonicity)
 
-        return execute_success
-        
+        ### first check time constraint
+        # if time.time() - self.planning_startTime >= self.time_threshold:
+        #     return False
+        print("object_ordering: " + str(self.object_ordering))
+        FLAG = False
+        ### check the base case: object_ordering has been fully filled
+        if (len(self.object_ordering) == self.num_objects):
+            return True
+        for obj_idx in self.all_objects:
+            if obj_idx in self.object_ordering:
+                continue
+            else:
+                ### the object has not been considered given the object_ordering, so let's check this object
+                ### before we start, let's book keep 
+                ### (1) the object's current pose as well as (2) the robot's current configuration
+                object_curr_pos, object_curr_position_idx = self.serviceCall_getCertainObjectPose(obj_idx)
+                robot_curr_config = self.serviceCall_getCurrRobotConfig()
+                rearrange_success, object_path = self.serviceCall_rearrangeCylinderObject(
+                                                    obj_idx, "Right_torso", isLabeledRoadmapUsed=self.isLabeledRoadmapUsed)
+                if rearrange_success:
+                    self.object_ordering.append(obj_idx)
+                    self.object_paths.append(object_path)
+                    ### recursive call
+                    FLAG = self.DFS()
+                    if FLAG: 
+                        return FLAG
+                    else:
+                        ### put the object and robot back to the configuration they belong to
+                        ### at the beginning of the function call
+                        update_success = self.serviceCall_updateCertainObjectPose(
+                                                obj_idx, object_curr_pos, object_curr_position_idx)
+                        update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
+                        update_success = self.serviceCall_updateManipulationStatus("Right_torso")
+                else:
+                    ### put the object and robot back to the configuration they belong to
+                    ### at the beginning of the function call
+                    update_success = self.serviceCall_updateCertainObjectPose(
+                                            obj_idx, object_curr_pos, object_curr_position_idx)
+                    update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
+                    update_success = self.serviceCall_updateManipulationStatus("Right_torso")
 
-    def rosInit(self):
-        ### This function specifies the role of a node instance for this class ###
-        ### and initializes a ros node
-        rospy.init_node("rearrangement_task_planner", anonymous=True)
+        ### if there is no option, before returning back
+        ### pop the last element on the object_ordering
+        if self.object_ordering != []:
+            self.object_ordering.pop(-1)
+            self.object_paths.pop(-1)
+
+        return FLAG
+
+    def DFS_DP(self):
+        '''search for the remaining object ordering based on current object ordering
+           but it remembers all the explored status'''
+        ### (1) update self.object_ordering and self.paths (a list of ObjectRearrangePath paths)
+        ### (2) increment the explored list (item: set())
+        ### (3) return FLAG==true if the problem is solved by DFS_DP (an indication of monotonicity)
+
+        ### first check time constraint
+        # if time.time() - self.planning_startTime >= self.time_threshold:
+        #     return False
+        print("object_ordering: " + str(self.object_ordering))
+        FLAG = False
+        ### check the base case: object_ordering has been fully filled
+        if (len(self.object_ordering) == self.num_objects):
+            return True
+        for obj_idx in self.all_objects:
+            if obj_idx in self.object_ordering:
+                continue
+            if set(self.object_ordering + [obj_idx]) in self.explored:
+                ### this new ordering has been explored before and turns out to be failure
+                ### no need to do it again
+                continue
+            ### the object has not been considered given the object_ordering, so let's check this object
+            ### before we start, let's book keep 
+            ### (1) the object's current pose as well as (2) the robot's current configuration
+            object_curr_pos, object_curr_position_idx = self.serviceCall_getCertainObjectPose(obj_idx)
+            robot_curr_config = self.serviceCall_getCurrRobotConfig()
+            rearrange_success, object_path = self.serviceCall_rearrangeCylinderObject(
+                                                    obj_idx, "Right_torso", isLabeledRoadmapUsed=self.isLabeledRoadmapUsed)
+            if rearrange_success:
+                self.object_ordering.append(obj_idx)
+                self.object_paths.append(object_path)
+                ### recursive call
+                FLAG = self.DFS_DP()
+                if FLAG: 
+                    return FLAG
+                else:
+                    ### put the object and robot back to the configuration they belong to
+                    ### at the beginning of the function call
+                    update_success = self.serviceCall_updateCertainObjectPose(
+                                            obj_idx, object_curr_pos, object_curr_position_idx)
+                    update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
+                    update_success = self.serviceCall_updateManipulationStatus("Right_torso")
+            else:
+                ### put the object and robot back to the configuration they belong to
+                ### at the beginning of the function call
+                update_success = self.serviceCall_updateCertainObjectPose(
+                                        obj_idx, object_curr_pos, object_curr_position_idx)
+                update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
+                update_success = self.serviceCall_updateManipulationStatus("Right_torso")
+
+        ### if there is no option, before returning back
+        ### pop the last element on the object_ordering
+        if self.object_ordering != []:
+            ### before pop out, you need to remember that
+            ### you have fully explored the subtree (subproblem)
+            ### which has the current ordering as the root
+            ### you need to mark it as explored
+            self.explored.append(set(self.object_ordering)) 
+            self.object_ordering.pop(-1)
+            self.object_paths.pop(-1)
+
+        return FLAG
+
+    def DFS_DP_task_planning(self, nums_objects, isLabeledRoadmapUsed=True):
+        self.setPlanningParams(nums_objects, isLabeledRoadmapUsed)
+        self.explored = [] ### a list of set() - current object set (e.g, (1,2,3) == (3,2,1))
+        TASK_SUCCESS = self.DFS_DP()
+        return TASK_SUCCESS
+
+    def mRS_task_planning(self, nums_objects, isLabeledRoadmapUsed=True):
+        self.setPlanningParams(nums_objects, isLabeledRoadmapUsed)
+        TASK_SUCCESS = self.DFS()
+        return TASK_SUCCESS
 
 
 def main(args):
-    rearrangement_task_planner = RearrangementTaskPlanner(args)
-    rearrangement_task_planner.rosInit()
-    rate = rospy.Rate(10) ### 10hz
-
-    initialize_instance_success = rearrangement_task_planner.serviceCall_generateInstanceCylinder()
-    if initialize_instance_success:
-        cylinder_objects = rearrangement_task_planner.serviceCall_cylinderPositionEstimate()
-        reproduce_instance_success = rearrangement_task_planner.serviceCall_reproduceInstanceCylinder(cylinder_objects)
-
-        object_ordering = input('give me an object ordering')
-        object_ordering = str(object_ordering)
-        object_ordering = object_ordering.split(",")
-        object_ordering = [int(i) for i in object_ordering]
-        # object_ordering = [2, 1, 3, 4, 0]
-        # object_ordering = [2]
-        print(object_ordering)
-        whole_path = []
-        TASK_SUCCESS = True
-        # obj_idx = 2
-        start_time = time.time()
-        for obj_idx in object_ordering:
-            rearrange_success, object_path = rearrangement_task_planner.serviceCall_rearrangeCylinderObject(obj_idx, "Right_torso")
-            if not rearrange_success:
-                print("oh ow, you failed at object: {}".format(obj_idx))
-                TASK_SUCCESS = False
-                break
-            ### otherwise get the path
-            whole_path.append(object_path)
-        print("Time for planning is: {}".format(time.time() - start_time))
-
-        if TASK_SUCCESS:
-            input("enter to start the execution!!!!!")
-            start_time = time.time()
-            execute_success = rearrangement_task_planner.executeWholePlan(whole_path)
-            if execute_success: 
-                rospy.logwarn("THE REARRANGEMENT TASK IS FULFILLED BY THE ROBOT")
-            else:
-                rospy.logwarn("THE REARRANGEMENT TASK IS NOT FULFILLED BY THE ROBOT")
-            print("Time for executing is: {}".format(time.time() - start_time))
-
-    while not rospy.is_shutdown():
-        rate.sleep()
+    rospy.logwarn("YOU ARE TOUCHING THE MAIN FUNCTION OF REARRANGEMENT TASK PLANNER!!!")
 
 if __name__ == '__main__':
     main(sys.argv)

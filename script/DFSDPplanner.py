@@ -1,25 +1,3 @@
-#!/usr/bin/env python
-from __future__ import division
-
-import time
-import sys
-import os
-import numpy as np
-
-import rospy
-import rospkg
-
-from geometry_msgs.msg import Point
-from sensor_msgs.msg import JointState
-
-from uniform_object_rearrangement.msg import CylinderObj
-from uniform_object_rearrangement.msg import ObjectRearrangePath
-from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderRequest
-from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
-from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
-from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectRequest
-from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
-from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 from uniform_object_rearrangement.srv import GetCertainObjectPose, GetCertainObjectPoseRequest
 from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotConfigRequest
 from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseRequest
@@ -54,43 +32,6 @@ class DFSDPplanner(object):
         self.explored = [] ### a list of set() - current object set (e.g, (1,2,3) == (3,2,1))
         self.time_threshold = 180 ### 180s
         self.planning_startTime = time.time()
-
-    def serviceCall_generateInstanceCylinder(self, num_objects, instance_number, isNewInstance):
-        rospy.wait_for_service("generate_instance_cylinder")
-        request = GenerateInstanceCylinderRequest()
-        request.num_objects = num_objects
-        request.instance_number = instance_number
-        request.isNewInstance = isNewInstance
-        try:
-            generateInstanceCylinder_proxy = rospy.ServiceProxy(
-                        "generate_instance_cylinder", GenerateInstanceCylinder)
-            success = generateInstanceCylinder_proxy(request.num_objects, request.instance_number, request.isNewInstance)
-            return success.success
-        except rospy.ServiceException as e:
-            print("generate_instance_cylinder service call failed: %s" % e)
-
-    def serviceCall_cylinderPositionEstimate(self):
-        rospy.wait_for_service("cylinder_position_estimate")
-        request = CylinderPositionEstimateRequest()
-        try:
-            cylinderPositionEstimate_proxy = rospy.ServiceProxy(
-                "cylinder_position_estimate", CylinderPositionEstimate)
-            cylinder_position_estimate_response = cylinderPositionEstimate_proxy(request)
-            return cylinder_position_estimate_response.cylinder_objects
-        except rospy.ServiceException as e:
-            print("cylinder_position_estimate service call failed: %s" % e)
-
-    def serviceCall_reproduceInstanceCylinder(self, cylinder_objects):
-        ### Input: cylinder_objects (CylinderObj[])
-        rospy.wait_for_service("reproduce_instance_cylinder")
-        request = ReproduceInstanceCylinderRequest(cylinder_objects)
-        try:
-            reproduceInstanceCylinder_proxy = rospy.ServiceProxy(
-                "reproduce_instance_cylinder", ReproduceInstanceCylinder)
-            success = reproduceInstanceCylinder_proxy(request.cylinder_objects)
-            return success.success
-        except rospy.ServiceException as e:
-            print("reproduce_instance_cylinder service call failed: %s" % e)
 
     def serviceCall_rearrangeCylinderObject(self, obj_idx, armType, isLabeledRoadmapUsed=True):
         rospy.wait_for_service("rearrange_cylinder_object")
@@ -315,7 +256,6 @@ def main(args):
     dfsdp_task_planner.rosInit()
     rate = rospy.Rate(10) ### 10hz
 
-    ### get the arguments
     ### get the arguments
     num_objects = int(args[1])
     instance_number = int(args[2])

@@ -180,7 +180,7 @@ class WorkspaceTable(object):
         self.side_clearance_x = side_clearance_x
         self.side_clearance_y = side_clearance_y
 
-    def generateInstance_cylinders(self, num_objects, instance_number):
+    def generateInstance_cylinders(self, num_objects):
         ### return: success (bool)
 
         self.num_objects = num_objects ### obtain the number of objects
@@ -246,21 +246,15 @@ class WorkspaceTable(object):
                     baseVisualShapeIndex=temp_cylinder_v,
                 basePosition=self.all_position_candidates[position_idx], physicsClientId=self.server)
 
-        instanceFile = os.path.join(self.rosPackagePath, "examples", str(num_objects)) + "/" + str(instance_number) + ".txt"
-        f_instance = open(instanceFile, "w")
         ############## printing test ##############
         for obj_idx in range(self.num_objects):
             print(obj_idx)
-            f_instance.write(str(obj_idx) + "\n")
             print(self.object_geometries[obj_idx].curr_pos)
             print(self.object_geometries[obj_idx].curr_position_idx)
-            temp_curr_pos = self.object_geometries[obj_idx].curr_pos
-            f_instance.write(str(temp_curr_pos[0]) + " " + str(temp_curr_pos[1]) + " " + str(temp_curr_pos[2]) + "\n")
             print(self.object_geometries[obj_idx].goal_pos)
             print(self.object_geometries[obj_idx].goal_position_idx)
             print(self.object_geometries[obj_idx].rgbacolor)
         ###########################################
-        f_instance.close()
         
         return True
 
