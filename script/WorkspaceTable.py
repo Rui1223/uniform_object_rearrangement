@@ -491,6 +491,13 @@ class WorkspaceTable(object):
         # for candidate_idx, cylinder_object in self.object_geometries.items():
         #     print(str(candidate_idx) + ": " + str(cylinder_object.curr_pos))
 
+    def clear_planning_instance(self):
+        ### this function deletes all object meshes in the workspace
+        ### and empty object_geometries
+        for obj_idx, object_info in self.object_geometries.items():
+            p.removeBody(object_info.geo)
+        self.object_geometries = OrderedDict()
+
 
 ### general class of object in the workspace
 class AnyObject(object):

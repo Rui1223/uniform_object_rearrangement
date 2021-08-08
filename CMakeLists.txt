@@ -65,6 +65,7 @@ add_service_files(
   AstarPathFinding.srv
   AstarPathFindingLabeled.srv
   AttachObject.srv
+  ClearPlanningInstance.srv
   CylinderPoseEstimate.srv
   CylinderPositionEstimate.srv
   ExecuteTrajectory.srv

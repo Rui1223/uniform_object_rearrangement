@@ -46,6 +46,16 @@ class Planner(object):
         self.query_idx = 1 ### record the current planning query index
         self.loadIKdataset()
 
+    def resetPlannerParams(self):
+        self.isObjectInLeftHand = False
+        self.isObjectInRightHand = False
+        self.objectInLeftHand = None
+        self.objectInRightHand = None
+        self.objectInLeftHand_idx = -1
+        self.objectInRightHand_idx = -1
+        self.leftLocalPose = [[-1, -1, -1], [-1, -1, -1, -1]]
+        self.rightLocalPose = [[-1, -1, -1], [-1, -1, -1, -1]]
+        self.query_idx = 1 ### record the current planning query index        
 
     def setRobotToConfig(self, ik_config, robot, armType):
         ### this function set the robot to certain config (with stepSimulation)

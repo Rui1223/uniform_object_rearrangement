@@ -13,6 +13,7 @@ from uniform_object_rearrangement.msg import CylinderObj
 from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderRequest
 from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
+from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceRequest
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
@@ -61,8 +62,9 @@ class MonotoneExperimenter(object):
         try:
             generateInstanceCylinder_proxy = rospy.ServiceProxy(
                         "generate_instance_cylinder", GenerateInstanceCylinder)
-            success = generateInstanceCylinder_proxy(request.num_objects, request.instance_number, request.isNewInstance)
-            return success.success
+            generate_instance_cylinder_response = generateInstanceCylinder_proxy(
+                    request.num_objects, request.instance_number, request.isNewInstance)
+            return generate_instance_cylinder_response.success
         except rospy.ServiceException as e:
             print("generate_instance_cylinder service call failed: %s" % e)
 
@@ -84,14 +86,20 @@ class MonotoneExperimenter(object):
         try:
             reproduceInstanceCylinder_proxy = rospy.ServiceProxy(
                 "reproduce_instance_cylinder", ReproduceInstanceCylinder)
-            success = reproduceInstanceCylinder_proxy(request.cylinder_objects)
-            return success.success
+            reproduce_instance_cylinder_response = reproduceInstanceCylinder_proxy(request.cylinder_objects)
+            return reproduce_instance_cylinder_response.success
         except rospy.ServiceException as e:
             print("reproduce_instance_cylinder service call failed: %s" % e)
 
-    def serviceCall_clear_instance(self):
-        rospy.wait_for_service("clear_instance")
-        request = ClearInstanceRequest()
+    def serviceCall_clear_planning_instance(self):
+        rospy.wait_for_service("clear_planning_instance")
+        request = ClearPlanningInstanceRequest()
+        try:
+            clearPlanningInstance_proxy = rospy.ServiceProxy("clear_planning_instance", ClearPlanningInstance)
+            clear_planning_instance_response = clearPlanningInstance_proxy(request)
+            return clear_planning_instance_response.success
+        except rospy.ServiceException as e:
+            print("clear_planning_instance service call failed: %s" % e)
 
     def serviceCall_execute_trajectory(self, traj):
         '''call the ExecuteTrajectory service to execute the given trajectory
@@ -225,8 +233,8 @@ def main(args):
                 # DFS_DP_execution_time = time.time() - start_time
                 # print("Time for executing is: {}".format(DFS_DP_execution_time))
             
-            ### Before moving on to the next instance, clear the current instance
-            monotone_experimenter.serviceCall_clear_instance()
+            ## Before moving on to the next instance, clear the current instance
+            monotone_experimenter.serviceCall_clear_planning_instance()
 
 
     while not rospy.is_shutdown():

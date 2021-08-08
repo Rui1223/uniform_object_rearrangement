@@ -31,6 +31,7 @@ from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotCon
 from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseResponse
 from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigResponse
 from uniform_object_rearrangement.srv import UpdateManipulationStatus, UpdateManipulationStatusResponse
+from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceResponse
 
 ################################## description #####################################
 ### This class defines a PybulletPlanScene class which
@@ -138,6 +139,10 @@ class PybulletPlanScene(object):
             "update_manipulation_status", UpdateManipulationStatus,
             self.update_manipulation_status_callback)
 
+        self.clear_planning_instance_server = rospy.Service(
+            "clear_planning_instance", ClearPlanningInstance,
+            self.clear_planning_instance_callback)
+
         rospy.init_node("pybullet_plan_scene", anonymous=True)
 
 
@@ -187,6 +192,19 @@ class PybulletPlanScene(object):
         self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
         # print("successfully update the manipulation status")
         return UpdateManipulationStatusResponse(True)
+
+    def clear_planning_instance_callback(self, req):
+        ### clear the instance in the planning scene, which involves
+        ### (i) delete all object meshes in the workspace and empty object_geometries
+        self.workspace_p.clear_planning_instance()
+        ### (ii) reset some planner parameters
+        self.planner_p.resetPlannerParams()
+        ### (iii) reset the robot back to the homeconfiguration
+        self.robot_p.resetArmConfig_torso(
+            self.robot_p.leftArmHomeConfiguration+self.rightArmHomeConfiguration, \
+                                                self.robot_p.torsoHomeConfiguration)
+        self.robot_p.resetRightHandConfig(self.robot_p.rightHandHomeConfiguration)
+        return ClearPlanningInstanceResponse(True)
 
 
     def getCurrentConfig(self, armType):
