@@ -231,6 +231,11 @@ class MotomanRobot(object):
             self.setRestPoses(
                 torsoConfig, self.leftArmCurrConfiguration, singleArmConfig, self.rightHandCurrConfiguration)
 
+    def resetRobotToHomeConfiguration(self):
+        ### this function reset the robot to home configuration (torso, arms, hand)
+        self.resetArmConfig_torso(self.leftArmHomeConfiguration+self.rightArmHomeConfiguration, self.torsoHomeConfiguration)
+        self.resetRightHandConfig(self.rightHandHomeConfiguration)
+
 
     def moveSingleArm(self, singleArmConfig, armType):
         ### move single arm by resetJointState() function

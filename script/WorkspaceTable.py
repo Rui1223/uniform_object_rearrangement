@@ -236,15 +236,18 @@ class WorkspaceTable(object):
 
         ### assign goal positions
         self.assignGoalPositions()
+        self.goal_visualization_mesh = OrderedDict() ### obj_idx (key): [position_idx, mesh] (value)
         for obj_idx, position_idx in self.all_goal_positions.items():
-            self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx) ### assignment goal position
+            self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx) ### assign goal position
             ### visualize it for confirmation
             temp_rgbacolor = self.color_pools[obj_idx] + [0.25]
             temp_cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-                    radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=temp_rgbacolor, physicsClientId=self.server)
+                    radius=self.cylinder_radius, length=self.cylinder_height, 
+                    rgbaColor=temp_rgbacolor, physicsClientId=self.server)
             temp_cylinder_objectM = p.createMultiBody(
                     baseVisualShapeIndex=temp_cylinder_v,
                 basePosition=self.all_position_candidates[position_idx], physicsClientId=self.server)
+            self.goal_visualization_mesh[obj_idx] = [position_idx, temp_cylinder_objectM]
 
         ############## printing test ##############
         for obj_idx in range(self.num_objects):
@@ -349,16 +352,18 @@ class WorkspaceTable(object):
 
         ### now assign the goal positions and visualize them
         self.assignGoalPositions()
+        self.goal_visualization_mesh = OrderedDict() ### obj_idx (key): [position_idx, mesh] (value)
         for obj_idx, position_idx in self.all_goal_positions.items():
-            self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx)
+            self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx) ### assign goal position
             ### visualize it for confirmation
-            object_rgbacolor_goal = self.color_pools[obj_idx] + [0.25]
-            cylinder_goal_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+            temp_rgbacolor = self.color_pools[obj_idx] + [0.25]
+            temp_cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
                     radius=self.cylinder_radius, length=self.cylinder_height, 
-                    rgbaColor=object_rgbacolor_goal, physicsClientId=self.server)
-            cylinder_objectM_goal = p.createMultiBody(
-                baseVisualShapeIndex=cylinder_goal_v,
+                    rgbaColor=temp_rgbacolor, physicsClientId=self.server)
+            temp_cylinder_objectM = p.createMultiBody(
+                baseVisualShapeIndex=temp_cylinder_v,
                 basePosition=self.all_position_candidates[position_idx], physicsClientId=self.server)
+            self.goal_visualization_mesh[obj_idx] = [position_idx, temp_cylinder_objectM]
 
         ############## printing test ##############
         for obj_idx in range(self.num_objects):
@@ -493,11 +498,20 @@ class WorkspaceTable(object):
 
     def clear_planning_instance(self):
         ### this function deletes all object meshes in the workspace
-        ### and empty object_geometries
+        ### and empties object_geometries
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
         self.object_geometries = OrderedDict()
 
+    def clear_execution_instance(self):
+        ### this function deletes all object meshes in the workspace
+        ### empties object_geometries and deletes goal visualization meshes
+        for obj_idx, object_info in self.object_geometries.items():
+            p.removeBody(object_info.geo)
+        self.object_geometries = OrderedDict()
+        for obj_idx, goal_info in self.goal_visualization_mesh.items():
+            p.removeBody(goal_info[1])
+        self.goal_visualization_mesh = OrderedDict()
 
 ### general class of object in the workspace
 class AnyObject(object):

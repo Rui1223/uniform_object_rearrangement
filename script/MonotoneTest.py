@@ -13,37 +13,40 @@ from uniform_object_rearrangement.msg import CylinderObj
 from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderRequest
 from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
-from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceRequest
-from uniform_object_rearrangement.srv import ClearExecutionInstance, ClearExecutionInstanceRequest
-from uniform_object_rearrangement.srv import ResetRoadmap, ResetRoadmapRequest
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
 from RearrangementTaskPlanner import RearrangementTaskPlanner
 
-class MonotoneExperimenter(object):
+############################### description #########################################
+### This class defines a MonotoneTest class which
+### solves an rearrangement problem/example with 
+### the number of the object specified
+### It
+### (1) asks the execution scene to generate an instance
+### (2) asks the pose estimator to get the object poses
+### (3) reproduces the instance in task planner and solve it with a specified planner
+### (4) asks the planning scene to plan the manipulation paths
+### (5) asks the execution scene to execute the planned paths
+#####################################################################################
+
+class MonotoneTester(object):
 
     def __init__(self, args):
         ### set the rospkg path
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
-        self.ExperimentsFolder = os.path.join(self.rosPackagePath, "monotone_experiments")
-        if not os.path.exists(self.ExperimentsFolder):
-            os.makedirs(self.ExperimentsFolder)
-        self.numObjects_options = [5, 6, 7]
-        # self.numObjects_options = [5, 7, 9, 10, 11, 12, 13, 14]
-        self.numExperiments_perObject = int(args[1])
-        self.maxInstancesNeed_perObject = int(args[2])
-
-    def createNumObjectsFolder(self, num_objects):
-        ### create a folder denoted with specified num_objects
-        temp_objectFolder = os.path.join(self.ExperimentsFolder, str(num_objects))
-        if not os.path.exists(temp_objectFolder):
-            os.makedirs(temp_objectFolder)
+        self.exampleFolder = os.path.join(self.rosPackagePath, "examples")
+        if not os.path.exists(self.exampleFolder):
+            os.makedirs(self.exampleFolder)
+        self.num_objects = int(args[1])
+        self.instance_id = int(args[2])
+        self.isNewInstance = True if args[3] == 'g' else False
+        self.method_name = args[4]
 
     def saveInstance(self, num_objects, instance_id, cylinder_objects):
         ### create a folder denoted with specified (num_objects, instance_id)
-        temp_instanceFolder = os.path.join(self.ExperimentsFolder, str(num_objects), str(instance_id))
+        temp_instanceFolder = os.path.join(self.exampleFolder, str(num_objects), str(instance_id))
         if not os.path.exists(temp_instanceFolder):
             os.makedirs(temp_instanceFolder)
         instanceFile = temp_instanceFolder + "/" + "instance_info.txt"
@@ -57,7 +60,7 @@ class MonotoneExperimenter(object):
         #############################################################
 
     def saveSolution(self, num_objects, instance_id, solution_time, solution_object_ordering, method_name):
-        temp_instanceFolder = os.path.join(self.ExperimentsFolder, str(num_objects), str(instance_id))
+        temp_instanceFolder = os.path.join(self.exampleFolder, str(num_objects), str(instance_id))
         solutionFile = temp_instanceFolder + "/" + method_name + ".txt"
         f_solution = open(solutionFile, "w")
         ################# write in the solution #####################
@@ -66,7 +69,6 @@ class MonotoneExperimenter(object):
             f_solution.write(str(obj_idx) + " ")
         f_solution.close()
         #############################################################
-
 
     def serviceCall_generateInstanceCylinder(self, num_objects, instance_number, isNewInstance):
         rospy.wait_for_service("generate_instance_cylinder")
@@ -105,37 +107,6 @@ class MonotoneExperimenter(object):
             return reproduce_instance_cylinder_response.success
         except rospy.ServiceException as e:
             print("reproduce_instance_cylinder service call failed: %s" % e)
-
-    def serviceCall_clear_planning_instance(self):
-        rospy.wait_for_service("clear_planning_instance")
-        request = ClearPlanningInstanceRequest()
-        try:
-            clearPlanningInstance_proxy = rospy.ServiceProxy("clear_planning_instance", ClearPlanningInstance)
-            clear_planning_instance_response = clearPlanningInstance_proxy(request)
-            return clear_planning_instance_response.success
-        except rospy.ServiceException as e:
-            print("clear_planning_instance service call failed: %s" % e)
-
-    def serviceCall_clear_execution_instance(self):
-        rospy.wait_for_service("clear_execution_instance")
-        request = ClearExecutionInstanceRequest()
-        try:
-            clearExecutionInstance_proxy = rospy.ServiceProxy("clear_execution_instance", ClearExecutionInstance)
-            clear_execution_instance_response = clearExecutionInstance_proxy(request)
-            return clear_execution_instance_response.success
-        except rospy.ServiceException as e:
-            print("clear_execution_instance service call failed: %s" % e)
-
-    def serviceCall_reset_roadmap(self, armType):
-        rospy.wait_for_service("reset_roadmap")
-        request = ResetRoadmapRequest()
-        request.armType = armType
-        try:
-            resetRoadmap_proxy = rospy.ServiceProxy("reset_roadmap", ResetRoadmap)
-            reset_roadmap_response = resetRoadmap_proxy(request)
-            return reset_roadmap_response.success
-        except rospy.ServiceException as e:
-            print("reset_roadmap service call failed: %s" % e)
 
     def serviceCall_execute_trajectory(self, traj):
         '''call the ExecuteTrajectory service to execute the given trajectory
@@ -205,75 +176,69 @@ class MonotoneExperimenter(object):
 
         return execute_success
 
+
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
         ### and initializes a ros node
-        rospy.init_node("monotone_experiments", anonymous=True)
+        rospy.init_node("monotone_test", anonymous=True)
 
 
 def main(args):
-    monotone_experimenter = MonotoneExperimenter(args)
+    monotone_tester = MonotoneTester(args)
     rearrangement_task_planner = RearrangementTaskPlanner()
-    monotone_experimenter.rosInit()
+    monotone_tester.rosInit()
     rate = rospy.Rate(10) ### 10hz
 
-    for num_objects in monotone_experimenter.numObjects_options:
-        ### create a folder for current num_objects
-        monotone_experimenter.createNumObjectsFolder(num_objects)
-        num_monotoneInstancesSaved = 0
-        for experiment_id in range(1, monotone_experimenter.numExperiments_perObject+1):
-            ### first see if we already have enough instances
-            if (num_monotoneInstancesSaved >= monotone_experimenter.maxInstancesNeed_perObject): break
-            ### generate an instance in the execution scene
-            initialize_instance_success = monotone_experimenter.serviceCall_generateInstanceCylinder(
-                                                                num_objects, num_monotoneInstancesSaved+1, True)
-            if not initialize_instance_success: continue
-            ### object pose estimation
-            cylinder_objects = monotone_experimenter.serviceCall_cylinderPositionEstimate()
-            ### reproduce the estimated object poses in the planning scene
-            reproduce_instance_success = monotone_experimenter.serviceCall_reproduceInstanceCylinder(cylinder_objects)
+    ### generate/load an instance in the execution scene
+    initialize_instance_success = monotone_tester.serviceCall_generateInstanceCylinder(
+        monotone_tester.num_objects, monotone_tester.instance_id, monotone_tester.isNewInstance)
+    if initialize_instance_success:
+        ### object pose estimation
+        cylinder_objects = monotone_tester.serviceCall_cylinderPositionEstimate()
+        ### reproduce the estimated object poses in the planning scene
+        reproduce_instance_success = monotone_tester.serviceCall_reproduceInstanceCylinder(cylinder_objects)
 
-            ########## now using different methods in the RearrangementTaskPlanner to solve the instance ##########
-            ## (i) DFS_DP_labeled
+        ####### now use the specified method to solve the instance #######
+        if monotone_tester.method_name == "DFS_DP_labeled":
             start_time = time.time()
-            TASK_SUCCESS, DFS_DP_labeled_object_ordering = \
-                        rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects))
-            DFS_DP_labeled_planning_time = time.time() - start_time
-            print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+            TASK_SUCCESS, object_ordering = \
+                rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects))
+            planning_time = time.time() - start_time
+            print("Time for DFS_DP_labeled planning is: {}".format(planning_time))
 
-            ### (ii) DFS_DP
-            # start_time = time.time()
-            # TASK_SUCCESS, DFS_DP_object_ordering = \
-            #     rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
-            # DFS_DP_planning_time = time.time() - start_time
-            # print("Time for DFS_DP planning is: {}".format(DFS_DP_planning_time))
+        if monotone_tester.method_name == "DFS_DP":
+            start_time = time.time()
+            TASK_SUCCESS, object_ordering = \
+                rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
+            planning_time = time.time() - start_time
+            print("Time for DFS_DP planning is: {}".format(planning_time))
 
-            ### (iii) mRS_labeled
-            # start_time = time.time()
-            # TASK_SUCCESS, mRS_labeled_object_ordering = \
-            #             rearrangement_task_planner.mRS_task_planning(len(cylinder_objects))
-            # mRS_labeled_planning_time = time.time() - start_time
-            # print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
+        if monotone_tester.method_name == "mRS_labeled":
+            start_time = time.time()
+            TASK_SUCCESS, object_ordering = \
+                rearrangement_task_planner.mRS_task_planning(len(cylinder_objects))
+            planning_time = time.time() - start_time
+            print("Time for mRS_labeled planning is: {}".format(planning_time))
 
-            ### (iv) mRS
-            # start_time = time.time()
-            # TASK_SUCCESS, mRS_object_ordering = \
-            #     rearrangement_task_planner.mRS_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
-            # mRS_planning_time = time.time() - start_time
-            # print("Time for mRS planning is: {}".format(mRS_planning_time))
-            #######################################################################################################
+        if monotone_tester.method_name == "mRS":
+            start_time = time.time()
+            TASK_SUCCESS, object_ordering = \
+                rearrangement_task_planner.mRS_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
+            planning_time = time.time() - start_time
+            print("Time for mRS planning is: {}".format(planning_time))
 
-            if TASK_SUCCESS:
-                num_monotoneInstancesSaved += 1
-                monotone_experimenter.saveInstance(num_objects, num_monotoneInstancesSaved, cylinder_objects)
-                monotone_experimenter.saveSolution(
-                    num_objects, num_monotoneInstancesSaved, \
-                    DFS_DP_labeled_planning_time, DFS_DP_labeled_object_ordering, "DFS_DP_labeled")
-            
-            ## Before moving on to the next instance, clear the current instance
-            clear_planning_success = monotone_experimenter.serviceCall_clear_planning_instance()
-            clear_execution_success = monotone_experimenter.serviceCall_clear_execution_instance()
-            reset_roadmap_success = monotone_experimenter.serviceCall_reset_roadmap("Right_torso")
+        saveInstanceAndSolution = True if input("save instance & solution?(y/n)") == 'y' else False
+        print("save instance and solution: " + str(saveInstanceAndSolution))
+        if saveInstanceAndSolution:
+            monotone_tester.saveInstance(
+                monotone_tester.num_objects, monotone_tester.instance_id, cylinder_objects)
+            monotone_tester.saveSolution(
+                monotone_tester.num_objects, monotone_tester.instance_id, \
+                planning_time, object_ordering, monotone_tester.method_name)
+        input("enter to start the execution!!!!!")
+        start_time = time.time()
+        execute_success = monotone_tester.executeWholePlan(rearrangement_task_planner.object_paths)
+        print("Time for executing is: {}".format(time.time() - start_time))
 
     while not rospy.is_shutdown():
         rate.sleep()

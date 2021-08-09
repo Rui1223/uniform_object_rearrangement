@@ -23,6 +23,7 @@ from sensor_msgs.msg import Image
 
 from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderResponse
 from uniform_object_rearrangement.srv import CylinderPoseEstimate, CylinderPoseEstimateResponse
+from uniform_object_rearrangement.srv import ClearExecutionInstance, ClearExecutionInstanceResponse
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryResponse
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectResponse
 
@@ -118,15 +119,25 @@ class PybulletExecutionScene(object):
         ### and initialize a ros node
         self.color_im_pub = rospy.Publisher('rgb_images', Image, queue_size=10)
         self.depth_im_pub = rospy.Publisher('depth_images', Image, queue_size=10)
+
         self.generate_instance_cylinder_server = rospy.Service(
             "generate_instance_cylinder", GenerateInstanceCylinder, 
             self.generate_instance_cylinder_callback)
+
         self.cylinder_pose_estimate_server = rospy.Service(
-            "cylinder_pose_estimate", CylinderPoseEstimate, self.cylinder_pose_estimate_callback)
+            "cylinder_pose_estimate", CylinderPoseEstimate, 
+            self.cylinder_pose_estimate_callback)
+        
         self.execute_trajectory_server = rospy.Service(
             "execute_trajectory", ExecuteTrajectory, self.execute_traj_callback)
+
         self.attach_object_server = rospy.Service(
                 "attach_object", AttachObject, self.attach_object_callback)
+
+        self.clear_execution_instance_server = rospy.Service(
+            "clear_execution_instance", ClearExecutionInstance,
+            self.clear_execution_instance_callback)
+
         rospy.init_node("pybullet_execution_scene", anonymous=True)
 
     
@@ -152,6 +163,15 @@ class PybulletExecutionScene(object):
         else:
             print("fail to generate an instance")
         return GenerateInstanceCylinderResponse(success)
+
+    def clear_execution_instance_callback(self, req):
+        ### clear the instance in the execution scene, which involves
+        ### (i) delete all object meshes in the workspace, empty object_geometries,
+        ###     as well as deleting goal visualization mesh
+        self.workspace_e.clear_execution_instance()
+        ### (ii) reset the robot back to the home configuration
+        self.robot_e.resetRobotToHomeConfiguration()
+        return ClearExecutionInstanceResponse(True)
 
     def execute_traj_callback(self, req):
         ### given the request data: an ArmTrajectory object

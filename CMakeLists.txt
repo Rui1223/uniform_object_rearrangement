@@ -65,6 +65,7 @@ add_service_files(
   AstarPathFinding.srv
   AstarPathFindingLabeled.srv
   AttachObject.srv
+  ClearExecutionInstance.srv
   ClearPlanningInstance.srv
   CylinderPoseEstimate.srv
   CylinderPositionEstimate.srv
@@ -74,6 +75,7 @@ add_service_files(
   GetCurrRobotConfig.srv
   RearrangeCylinderObject.srv
   ReproduceInstanceCylinder.srv
+  ResetRoadmap.srv
   ResetRobotCurrConfig.srv
   UpdateCertainObjectPose.srv
   UpdateManipulationStatus.srv
@@ -133,7 +135,6 @@ catkin_install_python(PROGRAMS
   script/PybulletPlanScene.py
   script/PoseEstimator.py
 	script/RearrangementTaskPlanner.py
-  script/MRSplanner.py
     	DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ###########

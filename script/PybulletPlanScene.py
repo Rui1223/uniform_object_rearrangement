@@ -199,11 +199,8 @@ class PybulletPlanScene(object):
         self.workspace_p.clear_planning_instance()
         ### (ii) reset some planner parameters
         self.planner_p.resetPlannerParams()
-        ### (iii) reset the robot back to the homeconfiguration
-        self.robot_p.resetArmConfig_torso(
-            self.robot_p.leftArmHomeConfiguration+self.rightArmHomeConfiguration, \
-                                                self.robot_p.torsoHomeConfiguration)
-        self.robot_p.resetRightHandConfig(self.robot_p.rightHandHomeConfiguration)
+        ### (iii) reset the robot back to the home configuration
+        self.robot_p.resetRobotToHomeConfiguration()
         return ClearPlanningInstanceResponse(True)
 
 
@@ -214,7 +211,6 @@ class PybulletPlanScene(object):
             currConfig = copy.deepcopy([self.robot_p.torsoCurrConfiguration] + self.robot_p.rightArmCurrConfiguration)
         return currConfig
 
-    
     def generate_pose_candidates(self, position):
         ### position: [x,y,z]
         pose_candidates = []

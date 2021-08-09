@@ -6,6 +6,7 @@
 #include <ros/package.h>
 #include <uniform_object_rearrangement/AstarPathFinding.h>
 #include <uniform_object_rearrangement/AstarPathFindingLabeled.h>
+#include <uniform_object_rearrangement/ResetRoadmap.h>
 
 #include "Graph.hpp"
 #include "AstarSolver.hpp"
@@ -78,6 +79,17 @@ public:
         return true;
     }
 
+    bool resetRoadmapCallback(
+        uniform_object_rearrangement::ResetRoadmap::Request &req,
+        uniform_object_rearrangement::ResetRoadmap::Response &resp)
+    {
+        if (req.armType == "Right_torso") {
+            m_right_torso_g.resetEdgeStatus();
+        }
+        resp.success = true;
+        return true;
+    }
+
 };
 
 int main(int argc, char** argv)
@@ -102,6 +114,7 @@ int main(int argc, char** argv)
     // claim service the node provide (server)
     ros::ServiceServer astar_server = nh.advertiseService("astar_path_finding", &Planner_t::astarSolverCallback, &planner);
     ros::ServiceServer astar_labeled_server = nh.advertiseService("astar_path_finding_labeled", &Planner_t::astarSolverLabeledCallback, &planner);
+    ros::ServiceServer reset_roadmap_server = nh.advertiseService("reset_roadmap", &Planner_t::resetRoadmapCallback, &planner);
 
 
     // Loop at 2Hz until the node is shut down

@@ -62,6 +62,7 @@ public:
     std::vector<int> getEdgeLabelsInHand(int id1, int id2) { return m_edgeLabels_objectInHand[id1][id2]; }
     bool getEdgeInHandValidity(int id1, int id2) { return m_edgeInHandValidity[id1][id2]; }
     void modifyEdge(std::vector<uniform_object_rearrangement::Edge> &violated_edges, int query_idx);
+    void resetEdgeStatus();
 
     // printer
     void printStates();

@@ -54,6 +54,13 @@ void Graph_t::specify_edgeStatus()
     }
 }
 
+void Graph_t::resetEdgeStatus()
+{
+    for (int row_idx=0; row_idx<m_edgeStatus.size(); row_idx++) {
+        m_edgeStatus[row_idx] = std::vector<int>(m_nNodes, 0);
+    }
+}
+
 
 void Graph_t::specify_neighborCosts(std::string connections_file)
 {

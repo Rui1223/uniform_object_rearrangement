@@ -242,12 +242,12 @@ class RearrangementTaskPlanner(object):
         self.setPlanningParams(nums_objects, isLabeledRoadmapUsed)
         self.explored = [] ### a list of set() - current object set (e.g, (1,2,3) == (3,2,1))
         TASK_SUCCESS = self.DFS_DP()
-        return TASK_SUCCESS
+        return TASK_SUCCESS, self.object_ordering
 
     def mRS_task_planning(self, nums_objects, isLabeledRoadmapUsed=True):
         self.setPlanningParams(nums_objects, isLabeledRoadmapUsed)
         TASK_SUCCESS = self.DFS()
-        return TASK_SUCCESS
+        return TASK_SUCCESS, self.object_ordering
 
 
 def main(args):
