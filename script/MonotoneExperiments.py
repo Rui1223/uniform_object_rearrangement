@@ -30,8 +30,7 @@ class MonotoneExperimenter(object):
         self.ExperimentsFolder = os.path.join(self.rosPackagePath, "monotone_experiments")
         if not os.path.exists(self.ExperimentsFolder):
             os.makedirs(self.ExperimentsFolder)
-        self.numObjects_options = [5, 6, 7]
-        # self.numObjects_options = [5, 7, 9, 10, 11, 12, 13, 14]
+        self.numObjects_options = [6, 8]
         self.numExperiments_perObject = int(args[1])
         self.maxInstancesNeed_perObject = int(args[2])
 
