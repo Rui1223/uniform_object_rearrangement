@@ -480,8 +480,7 @@ class WorkspaceTable(object):
 
     
     def generateCandidatesGeometry_labeledRoadmap(self):
-        ''' This function generate object_geometries on all position candidates'''
-
+        '''This function generates object_geometries on all position candidates'''
         cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
             radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
         rgbacolor = [0.5, 0.5, 0.5, 0.5]
@@ -495,6 +494,24 @@ class WorkspaceTable(object):
         ### printing test
         # for candidate_idx, cylinder_object in self.object_geometries.items():
         #     print(str(candidate_idx) + ": " + str(cylinder_object.curr_pos))
+
+    def generateCandidatesGeometry(self):
+        '''This function generates geometries foe all position candidates'''
+        self.candidate_geometries = OrderedDict()
+        cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
+            radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
+        rgbacolor = [0.5, 0.5, 0.5, 0.5]
+        cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+            radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=[0.5, 0.5, 0.5, 0.5], physicsClientId=self.server)
+        for candidate_idx, candidate_pos in self.all_position_candidates.items():
+            cylinder_objectM = p.createMultiBody(
+                baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v, basePosition=candidate_pos, physicsClientId=self.server)
+            self.candidate_geometries[candidate_idx] = CylinderCandidate(
+                                candidate_idx, candidate_pos, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
+        ### printing test
+        # for candidate_idx, cylinder_candidate in self.candidate_geometries.items():
+        #     print(str(candidate_idx) + ": " + str(cylinder_candidate.pos))
+
 
     def clear_planning_instance(self):
         ### this function deletes all object meshes in the workspace
@@ -512,6 +529,8 @@ class WorkspaceTable(object):
         for obj_idx, goal_info in self.goal_visualization_mesh.items():
             p.removeBody(goal_info[1])
         self.goal_visualization_mesh = OrderedDict()
+
+
 
 ### general class of object in the workspace
 class AnyObject(object):
@@ -535,3 +554,13 @@ class CylinderObject(AnyObject):
     def setGoalPosition(self, goal_pos, goal_position_idx):
         self.goal_pos = goal_pos
         self.goal_position_idx = goal_position_idx
+
+class CylinderCandidate(object):
+    def __init__(self, position_idx, pos, geo, cylinder_radius, cylinder_height, rgbacolor):
+        self.position_idx = position_idx
+        self.pos = pos
+        self.geo = geo
+        self.cylinder_radius = cylinder_radius
+        self.cylinder_height = cylinder_height
+        self.rgbacolor = rgbacolor
+    ### More functions to be added later (if necessary) ###

@@ -10,6 +10,7 @@ import os
 import copy
 import math
 import numpy as np
+from collections import OrderedDict
 
 import rospy
 import rospkg
@@ -20,6 +21,7 @@ from geometry_msgs.msg import Point
 from MotomanRobot import MotomanRobot
 from WorkspaceTable import WorkspaceTable
 from Planner import Planner
+from Planner import PositionCandidateConfigs
 import utils
 
 from uniform_object_rearrangement.msg import ArmTrajectory
@@ -639,6 +641,43 @@ class PybulletPlanScene(object):
             temp_quat = utils.getQuaternionFromRotationMatrix(orientation)
             orientations.append(temp_quat)
         return orientations
+
+    def generatePosesForAllCandidates(self, armType):
+        self.planner_p.position_candidates_configPoses = OrderedDict()
+        cylinder_positions_geometries = {candidate.position_idx : candidate.geo for candidate in self.workspace_p.candidate_geometries.values()}
+        for candidate_idx, cylinder_candidate in self.workspace_p.candidate_geometries.items():
+            print("++++++++++++++CANDIDATE_IDX: " + str(candidate_idx) + "++++++++++++++")
+            self.planner_p.position_candidates_configPoses[candidate_idx] = PositionCandidateConfigs(candidate_idx)
+            ### first generate graspingPose_candidates with different orientation
+            graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos)
+            for pose_id, graspingPose in enumerate(graspingPose_candidates):
+                currConfig = self.getCurrentConfig(armType)
+                approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
+                    self.planner_p.generateConfigBasedOnPose_candidates(
+                        graspingPose, self.robot_p, self.workspace_p, armType, cylinder_positions_geometries)
+                if approaching_config != []:
+                    self.planner_p.position_candidates_configPoses[candidate_idx].approaching_configs.append(approaching_config)
+                    self.planner_p.position_candidates_configPoses[candidate_idx].grasping_configs.append(grasping_config)
+                    self.planner_p.position_candidates_configPoses[candidate_idx].approaching_labels.append(approaching_label)
+                    self.planner_p.position_candidates_configPoses[candidate_idx].grasping_labels.append(grasping_label)
+                    self.planner_p.position_candidates_configPoses[candidate_idx].total_labels.append(total_label)
+
+            print("=============================================================================")
+            print("candidate " + str(candidate_idx) + " approaching_configs: ", \
+                self.planner_p.position_candidates_configPoses[candidate_idx].approaching_configs)
+            print("candidate " + str(candidate_idx) + " grasping_configs: ", 
+                self.planner_p.position_candidates_configPoses[candidate_idx].grasping_configs)
+            print("candidate " + str(candidate_idx) + " approaching_labels: ", \
+                self.planner_p.position_candidates_configPoses[candidate_idx].approaching_labels)
+            print("candidate " + str(candidate_idx) + " grasping_labels: ", \
+                self.planner_p.position_candidates_configPoses[candidate_idx].grasping_labels)
+            print("candidate " + str(candidate_idx) + " total_labels: ", \
+                self.planner_p.position_candidates_configPoses[candidate_idx].total_labels)
+            input("ENTER to next candidate")
+        
+        ### wooo!!! finished!
+        ### save the whole position_candidates_configPoses
+        self.planner_p.serializeCandidatesConfigPoses()
 
     
     def calculateReachabilityMap(self, orientation, placeholder_shape="cylinder"):

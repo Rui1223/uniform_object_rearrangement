@@ -15,6 +15,7 @@ import IPython
 import subprocess
 from operator import itemgetter
 import copy
+import pickle
 
 import utils
 from CollisionChecker import CollisionChecker
@@ -1694,3 +1695,136 @@ class Planner(object):
             return response.searchSuccess, list(response.path)
         except rospy.ServiceException as e:
             print("Service call failed: %s" % e)
+
+
+    def generateConfigBasedOnPose_candidates(self, pose, robot, workspace, armType, cylinder_positions_geometries):
+        ### This function generate IK for a pose and check the IK
+        ### in term of reachablity, essential collisions, as well as labels
+        ### Input: pose: [[x,y,z],[x,y,z,w]]
+        ###        armType: "Left(torso)" or "Right(torso)"
+        ### Output: isIKValid (bool), singleArmConfig_IK (list)), FLAG
+
+        approaching_config_candidates = [] ### a list of approaching configs
+        grasping_config_candidates = [] ### a list of grasping configs
+        approaching_labels = [] ### a list of labels per approaching config
+        grasping_labels = [] ### a list of labels per grasping config
+        total_labels = [] ### a list of labels per (approaching + grasping)
+
+        if armType == "Left" or armType == "Left_torso":
+            ee_idx = robot.left_ee_idx
+            first_joint_index = 1
+        if armType == "Right" or armType == "Right_torso":
+            ee_idx = robot.right_ee_idx
+            first_joint_index = 8
+
+        tryAgain = True
+        while tryAgain == True:
+            ############################### check grasping pose #############################
+            rest_pose = self.randomRestPose(robot, armType)
+            ### we add rest pose in the IK solver to get as high-quality IK as possible
+            config_IK = p.calculateInverseKinematics(bodyUniqueId=robot.motomanGEO,
+                                    endEffectorLinkIndex=ee_idx,
+                                    targetPosition=pose[0],
+                                    targetOrientation=pose[1],
+                                    lowerLimits=robot.ll, upperLimits=robot.ul, 
+                                    jointRanges=robot.jr, restPoses=rest_pose,
+                                    maxNumIterations=2000, residualThreshold=0.0000001,
+                                    physicsClientId=robot.server)
+            if armType == "Left" or armType == "Right":
+                singleArmConfig_IK_grasping = list(config_IK[first_joint_index:first_joint_index+7])
+            if armType == "Left_torso" or armType == "Right_torso":
+                singleArmConfig_IK_grasping = [config_IK[0]] + list(config_IK[first_joint_index:first_joint_index+7])
+            self.setRobotToConfig(singleArmConfig_IK_grasping, robot, armType)
+            isIKValid, FLAG = self.checkSamplePoseIK(pose, robot, workspace, armType)
+            if not isIKValid:
+                tryAgain = True if input("Try another IK for the grasping pose (y/n)?") == 'y' else False
+                continue 
+            ### check labels
+            isConfigValid, FLAG, objectCollided_grasping = \
+                self.checkConfig_CollisionBetweenRobotAndStaticObjects_labeled(robot, cylinder_positions_geometries)
+            print("Labels for grasping pose: ", objectCollided_grasping)
+
+            ############################### check approaching pose #############################
+            temp_rot_matrix = p.getMatrixFromQuaternion(pose[1])
+            ### local z-axis of the end effector
+            temp_approaching_direction = [temp_rot_matrix[2], temp_rot_matrix[5], temp_rot_matrix[8]]
+            temp_pos = list(np.array(pose[0]) - 0.05*np.array(temp_approaching_direction))
+            new_pose = [temp_pos, pose[1]] ### the quaternion remains the same as input pose
+            q_newPoseIK = p.calculateInverseKinematics(bodyUniqueId=robot.motomanGEO, 
+                                    endEffectorLinkIndex=ee_idx, 
+                                    targetPosition=new_pose[0], 
+                                    targetOrientation=new_pose[1], 
+                                    lowerLimits=robot.ll, upperLimits=robot.ul, 
+                                    jointRanges=robot.jr, restPoses=rest_pose,
+                                    maxNumIterations=2000, residualThreshold=0.0000001,
+                                    physicsClientId=robot.server)
+            if armType == "Left" or armType == "Right":
+                singleArmConfig_IK_approaching = list(q_newPoseIK[first_joint_index:first_joint_index+7])
+            if armType == "Left_torso" or armType == "Right_torso":
+                singleArmConfig_IK_approaching = [q_newPoseIK[0]] + list(q_newPoseIK[first_joint_index:first_joint_index+7])
+            self.setRobotToConfig(singleArmConfig_IK_approaching, robot, armType)
+            isIKValid, FLAG = self.checkSamplePoseIK(new_pose, robot, workspace, armType)
+            if not isIKValid:
+                tryAgain = True if input("Try another IK for the grasping pose (y/n)?") == 'y' else False
+                continue
+            ### check labels
+            isConfigValid, FLAG, objectCollided_approaching = \
+                self.checkConfig_CollisionBetweenRobotAndStaticObjects_labeled(robot, cylinder_positions_geometries)
+            print("Labels for approaching pose: ", objectCollided_approaching)
+
+            ############### congrats! temporarily save this pose ###############
+            print("approaching config: ", singleArmConfig_IK_approaching)
+            print("grasping config: ", singleArmConfig_IK_grasping)
+            print("approaching labels: ", set(objectCollided_approaching))
+            print("grasping labels: ", set(objectCollided_grasping))
+            print("total labels: ", set(objectCollided_approaching + objectCollided_grasping))
+            approaching_config_candidates.append(singleArmConfig_IK_approaching)
+            grasping_config_candidates.append(singleArmConfig_IK_grasping)
+            approaching_labels.append(set(objectCollided_approaching))
+            grasping_labels.append(set(objectCollided_grasping))
+            total_labels.append(set(objectCollided_approaching + objectCollided_grasping))
+
+            tryAgain = True if input("Try another IK for the grasping pose (y/n)?") == 'y' else False
+        
+        ### out of the loop
+        print("out of the loop")
+        if total_labels == []:
+            return [], [], [], [], []
+        else:
+            print("approaching_config_candidates: ", approaching_config_candidates)
+            print("grasping_config_candidates: ", grasping_config_candidates)
+            print("approaching labels: ", approaching_labels)
+            print("grasping labels: ", grasping_labels)
+            print("total labels: ", total_labels)
+            pose_id = int(input("choose your favorite pose"))
+            while pose_id >= len(total_labels):
+                pose_id = int(input("choose your favorite pose (valid pose id, please)"))
+            return approaching_config_candidates[pose_id], grasping_config_candidates[pose_id], \
+                approaching_labels[pose_id], grasping_labels[pose_id], total_labels[pose_id]
+
+
+    def serializeCandidatesConfigPoses(self):
+        f_candidate_geometries = open(self.roadmapFolder+"/CandidateGeometries.obj", 'wb')
+        pickle.dump(self.position_candidates_configPoses, f_candidate_geometries)
+
+    def deserializeCandidatesConfigPoses(self):
+        f_candidate_geometries = open(self.roadmapFolder+"/CandidateGeometries.obj", 'rb')
+        self.position_candidates_configPoses = pickle.load(f_candidate_geometries)
+        # for candidate_idx, position_candidate_configs in self.position_candidates_configPoses.items():
+        #     if candidate_idx == 20:
+        #         print(candidate_idx)
+        #         print(position_candidate_configs.approaching_configs)
+        #         print(position_candidate_configs.grasping_configs)
+        #         print(position_candidate_configs.approaching_labels)
+        #         print(position_candidate_configs.grasping_labels)
+        #         print(position_candidate_configs.total_labels)
+
+class PositionCandidateConfigs(object):
+    def __init__(self, position_idx):
+        self.position_idx = position_idx
+        self.approaching_configs = [] ### a list of configs(list) with different orientations
+        self.grasping_configs = [] ### a list of configs(list) with different orientations
+        self.approaching_labels = [] ### a list of approaching labels(set) with different orientations
+        self.grasping_labels = [] ### a list of grasping labels(set) with different orientations
+        self.total_labels = [] ### a list of total labels(set) with different orientations
+    ### More functions to be added later (if necessary) ###
