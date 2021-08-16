@@ -536,7 +536,7 @@ class Planner(object):
         ee_dist_pos = utils.computePoseDist_pos(actual_ee_pose[0], desired_ee_pose[0])
         # print("actual_pose: " + str(actual_ee_pose[0]))
         # print("desired_pose: " + str(desired_ee_pose))
-        # print("position error: " + str(ee_dist_pos))
+        print("position error: " + str(ee_dist_pos))
         if ee_dist_pos > 0.02:
             print("IK not reachable as position error exceeds 2cm: " + str(ee_dist_pos))
             ### raise the flag
@@ -1797,27 +1797,21 @@ class Planner(object):
             print("grasping labels: ", grasping_labels)
             print("total labels: ", total_labels)
             pose_id = int(input("choose your favorite pose"))
-            while pose_id >= len(total_labels):
-                pose_id = int(input("choose your favorite pose (valid pose id, please)"))
-            return approaching_config_candidates[pose_id], grasping_config_candidates[pose_id], \
-                approaching_labels[pose_id], grasping_labels[pose_id], total_labels[pose_id]
+            if pose_id >= len(total_labels):
+                print("no pose is satisfying. return nothing")
+                return [], [], [], [], []
+            else:
+                return approaching_config_candidates[pose_id], grasping_config_candidates[pose_id], \
+                    approaching_labels[pose_id], grasping_labels[pose_id], total_labels[pose_id]
 
 
     def serializeCandidatesConfigPoses(self):
-        f_candidate_geometries = open(self.roadmapFolder+"/CandidateGeometries.obj", 'wb')
+        f_candidate_geometries = open(self.roadmapFolder+"/CandidatesConfigPoses.obj", 'wb')
         pickle.dump(self.position_candidates_configPoses, f_candidate_geometries)
 
     def deserializeCandidatesConfigPoses(self):
-        f_candidate_geometries = open(self.roadmapFolder+"/CandidateGeometries.obj", 'rb')
+        f_candidate_geometries = open(self.roadmapFolder+"/CandidatesConfigPoses.obj", 'rb')
         self.position_candidates_configPoses = pickle.load(f_candidate_geometries)
-        # for candidate_idx, position_candidate_configs in self.position_candidates_configPoses.items():
-        #     if candidate_idx == 20:
-        #         print(candidate_idx)
-        #         print(position_candidate_configs.approaching_configs)
-        #         print(position_candidate_configs.grasping_configs)
-        #         print(position_candidate_configs.approaching_labels)
-        #         print(position_candidate_configs.grasping_labels)
-        #         print(position_candidate_configs.total_labels)
 
 class PositionCandidateConfigs(object):
     def __init__(self, position_idx):

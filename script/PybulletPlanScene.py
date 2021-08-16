@@ -651,7 +651,6 @@ class PybulletPlanScene(object):
             ### first generate graspingPose_candidates with different orientation
             graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos)
             for pose_id, graspingPose in enumerate(graspingPose_candidates):
-                currConfig = self.getCurrentConfig(armType)
                 approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
                     self.planner_p.generateConfigBasedOnPose_candidates(
                         graspingPose, self.robot_p, self.workspace_p, armType, cylinder_positions_geometries)
