@@ -163,8 +163,9 @@ class PybulletPlanScene(object):
         temp_curr_pos = self.workspace_p.object_geometries[req.object_idx].curr_pos
         curr_position = Point(temp_curr_pos[0], temp_curr_pos[1], temp_curr_pos[2])
         curr_position_idx = self.workspace_p.object_geometries[req.object_idx].curr_position_idx
+        collision_position_idx = self.workspace_p.object_geometries[req.object_idx].collision_position_idx
         # print("successfully get the object pose for object " + str(req.object_idx))
-        return GetCertainObjectPoseResponse(curr_position, curr_position_idx)
+        return GetCertainObjectPoseResponse(curr_position, curr_position_idx, collision_position_idx)
 
     def get_curr_robot_config_callback(self, req):
         ### get the current robot config
@@ -176,7 +177,7 @@ class PybulletPlanScene(object):
     def update_certain_object_pose_callback(self, req):
         ### update the geometry mesh of a certain object to the target pose
         position = [req.target_pose.x, req.target_pose.y, req.target_pose.z]
-        self.workspace_p.updateObjectMesh(req.object_idx, position, req.object_position_idx)
+        self.workspace_p.updateObjectMesh(req.object_idx, position, req.object_position_idx, req.object_collision_position_idx)
         # print("successfully update certain object geometry to the target pose" + str(position))
         return UpdateCertainObjectPoseResponse(True)
 
@@ -400,6 +401,12 @@ class PybulletPlanScene(object):
                 print("The transfer placing path for %s arm is successfully found" % req.armType)
                 transfer_traj += placing_traj
                 transfer_success = True
+                ### after transferring the object, 
+                ### update the object's current position_idx and collision_position_idx
+                self.workspace_p.object_geometries[req.object_idx].setCurrPosition(
+                    self.workspace_p.object_geometries[req.object_idx].goal_position_idx,
+                    self.workspace_p.object_geometries[req.object_idx].goal_position_idx
+                )
                 break
             else:
                 print("The transfer placing path for %s arm is not successfully found" % req.armType)
@@ -580,9 +587,12 @@ class PybulletPlanScene(object):
                 print("The transfer placing path for %s arm is successfully found" % req.armType)
                 transfer_traj += placing_traj
                 transfer_success = True
-                ### after transferring the object, update the object's current position
-                self.workspace_p.object_geometries[req.object_idx].curr_position_idx = \
+                ### after transferring the object, 
+                ### update the object's current position_idx and collision_position_idx
+                self.workspace_p.object_geometries[req.object_idx].setCurrPosition(
+                    self.workspace_p.object_geometries[req.object_idx].goal_position_idx,
                     self.workspace_p.object_geometries[req.object_idx].goal_position_idx
+                )
                 break
             else:
                 print("The transfer placing path for %s arm is not successfully found" % req.armType)

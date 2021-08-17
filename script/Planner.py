@@ -1608,7 +1608,7 @@ class Planner(object):
         if armType == "Right_torso":
             for obj_idx, obj_info in workspace.object_geometries.items():
                 if (obj_idx != self.objectInRightHand_idx):
-                    occupied_labels.append(obj_info.curr_position_idx)
+                    occupied_labels.append(obj_info.collision_position_idx)
             if self.objectInRightHand_idx == -1:
                 isInHandManipulation = False
             else:

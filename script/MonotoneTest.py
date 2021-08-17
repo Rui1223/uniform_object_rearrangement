@@ -197,7 +197,6 @@ def main(args):
         cylinder_objects = monotone_tester.serviceCall_cylinderPositionEstimate()
         ### reproduce the estimated object poses in the planning scene
         reproduce_instance_success = monotone_tester.serviceCall_reproduceInstanceCylinder(cylinder_objects)
-        time.sleep(10000000)
 
         ####### now use the specified method to solve the instance #######
         if monotone_tester.method_name == "DFS_DP_labeled":

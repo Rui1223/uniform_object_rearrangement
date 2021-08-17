@@ -267,12 +267,13 @@ def main(args):
                 monotone_experimenter.saveInstance(num_objects, num_monotoneInstancesSaved, cylinder_objects)
                 monotone_experimenter.saveSolution(
                     num_objects, num_monotoneInstancesSaved, \
-                    DFS_DP_labeled_planning_time, DFS_DP_labeled_object_ordering, "DFS_DP_labeled")
+                    DFS_DP_labeled_planning_time, DFS_DP_labeled_object_ordering, "official")
             
             ## Before moving on to the next instance, clear the current instance
             clear_planning_success = monotone_experimenter.serviceCall_clear_planning_instance()
             clear_execution_success = monotone_experimenter.serviceCall_clear_execution_instance()
             reset_roadmap_success = monotone_experimenter.serviceCall_reset_roadmap("Right_torso")
+            input("check the clearance!!!")
 
     while not rospy.is_shutdown():
         rate.sleep()

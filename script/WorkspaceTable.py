@@ -255,7 +255,7 @@ class WorkspaceTable(object):
             self.object_geometries[obj_idx] = CylinderObject(
                                     obj_idx, cylinder_curr_position, cylinder_objectM, cylinder_radius, cylinder_height)
             collision_position_idx = self.assignToNearestCandiate(cylinder_curr_position)
-            self.object_geometries[obj_idx].setCurrPosition(cylinder_curr_position, self.num_candidates+counter, collision_position_idx)
+            self.object_geometries[obj_idx].setCurrPosition(self.num_candidates+counter, collision_position_idx)
             #############################################################################################################################
 
             ######################################### generate goal visualization mesh ##################################################
@@ -454,24 +454,29 @@ class WorkspaceTable(object):
         return nearest_candidate_idx
 
 
-    def updateObjectMesh(self, obj_idx, position, position_idx, orientation=[0, 0, 0, 1]):
+    def updateObjectMesh(self, obj_idx, position, position_idx, collision_position_idx, orientation=[0, 0, 0, 1]):
         ### input - target_pose: [x, y, z]
         p.resetBasePositionAndOrientation(
             self.object_geometries[obj_idx].geo, position, orientation, physicsClientId=self.server)
-        self.object_geometries[obj_idx].curr_pos = position
-        self.object_geometries[obj_idx].curr_position_idx = position_idx
+        self.object_geometries[obj_idx].setCurrPosition(position_idx, collision_position_idx, position)
 
 
     def clear_planning_instance(self):
-        ### this function deletes all object meshes in the workspace
-        ### and empties object_geometries
+        ### this function clears the planning instance
+        ### (1) empties assigned goal position
+        self.all_goal_positions = OrderedDict()
+        ### (2) deletes all object meshes in the workspace
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
         self.object_geometries = OrderedDict()
+        ### (3) delete visualization meshes in the workspace
+        for obj_idx, object_mesh in self.goal_visualization_mesh.items():
+            p.removeBody(object_mesh)
+        self.goal_visualization_mesh = OrderedDict()
 
     def clear_execution_instance(self):
-        ### this function deletes all object meshes in the workspace
-        ### empties object_geometries and deletes goal visualization meshes
+        ### this function clears the execution instance
+        ### (1) deletes all object meshes in the workspace
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
         self.object_geometries = OrderedDict()
@@ -491,10 +496,11 @@ class CylinderObject(AnyObject):
         self.cylinder_radius = cylinder_radius
         self.cylinder_height = cylinder_height
 
-    def setCurrPosition(self, curr_pos, curr_position_idx, collision_position_idx):
-        self.curr_pos = curr_pos
+    def setCurrPosition(self, curr_position_idx, collision_position_idx, curr_pos=None):
         self.curr_position_idx = curr_position_idx
         self.collision_position_idx = collision_position_idx
+        if curr_pos != None:
+            self.curr_pos = curr_pos
 
     def setGoalPosition(self, goal_pos, goal_position_idx):
         self.goal_pos = goal_pos

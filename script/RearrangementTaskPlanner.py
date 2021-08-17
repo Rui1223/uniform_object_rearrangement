@@ -46,7 +46,8 @@ class RearrangementTaskPlanner(object):
             object_curr_pos = [getObjectPose_response.curr_position.x, \
                 getObjectPose_response.curr_position.y, getObjectPose_response.curr_position.z]
             object_curr_position_idx = getObjectPose_response.curr_position_idx
-            return object_curr_pos, object_curr_position_idx
+            object_collision_position_idx = getObjectPose_response.collision_position_idx
+            return object_curr_pos, object_curr_position_idx, object_collision_position_idx
         except rospy.ServiceException as e:
             print("get_certain_object_pose service call failed: %s" % e)
 
@@ -76,7 +77,7 @@ class RearrangementTaskPlanner(object):
         except rospy.ServiceException as e:
             print("rearrange_cylinder_object service call failed: %s" % e)
 
-    def serviceCall_updateCertainObjectPose(self, obj_idx, target_pose, target_position_idx):
+    def serviceCall_updateCertainObjectPose(self, obj_idx, target_pose, target_position_idx, target_collision_position_idx):
         '''call the UpdateCertainObjectPose service to update the object
            to the specified target pose'''
         rospy.wait_for_service("update_certain_object_pose")
@@ -84,11 +85,12 @@ class RearrangementTaskPlanner(object):
         request.object_idx = obj_idx
         request.target_pose = Point(target_pose[0], target_pose[1], target_pose[2])
         request.object_position_idx = target_position_idx
+        request.object_collision_position_idx = target_collision_position_idx
         try:
             updateCertainObjectPose_proxy = rospy.ServiceProxy(
                                             "update_certain_object_pose", UpdateCertainObjectPose)
             updateCertainObjectPose_response = updateCertainObjectPose_proxy(
-                                request.object_idx, request.target_pose, request.object_position_idx)
+                request.object_idx, request.target_pose, request.object_position_idx, request.object_collision_position_idx)
             return updateCertainObjectPose_response.success
         except rospy.ServiceException as e:
             print("update_certain_object_pose service call failed: %s" % e)
@@ -140,7 +142,7 @@ class RearrangementTaskPlanner(object):
                 ### the object has not been considered given the object_ordering, so let's check this object
                 ### before we start, let's book keep 
                 ### (1) the object's current pose as well as (2) the robot's current configuration
-                object_curr_pos, object_curr_position_idx = self.serviceCall_getCertainObjectPose(obj_idx)
+                object_curr_pos, object_curr_position_idx, object_collision_position_idx = self.serviceCall_getCertainObjectPose(obj_idx)
                 robot_curr_config = self.serviceCall_getCurrRobotConfig()
                 rearrange_success, object_path = self.serviceCall_rearrangeCylinderObject(
                                                     obj_idx, "Right_torso", isLabeledRoadmapUsed=self.isLabeledRoadmapUsed)
@@ -155,14 +157,14 @@ class RearrangementTaskPlanner(object):
                         ### put the object and robot back to the configuration they belong to
                         ### at the beginning of the function call
                         update_success = self.serviceCall_updateCertainObjectPose(
-                                                obj_idx, object_curr_pos, object_curr_position_idx)
+                            obj_idx, object_curr_pos, object_curr_position_idx, object_collision_position_idx)
                         update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
                         update_success = self.serviceCall_updateManipulationStatus("Right_torso")
                 else:
                     ### put the object and robot back to the configuration they belong to
                     ### at the beginning of the function call
                     update_success = self.serviceCall_updateCertainObjectPose(
-                                            obj_idx, object_curr_pos, object_curr_position_idx)
+                        obj_idx, object_curr_pos, object_curr_position_idx, object_collision_position_idx)
                     update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
                     update_success = self.serviceCall_updateManipulationStatus("Right_torso")
 
@@ -199,7 +201,7 @@ class RearrangementTaskPlanner(object):
             ### the object has not been considered given the object_ordering, so let's check this object
             ### before we start, let's book keep 
             ### (1) the object's current pose as well as (2) the robot's current configuration
-            object_curr_pos, object_curr_position_idx = self.serviceCall_getCertainObjectPose(obj_idx)
+            object_curr_pos, object_curr_position_idx, object_collision_position_idx = self.serviceCall_getCertainObjectPose(obj_idx)
             robot_curr_config = self.serviceCall_getCurrRobotConfig()
             rearrange_success, object_path = self.serviceCall_rearrangeCylinderObject(
                                                     obj_idx, "Right_torso", isLabeledRoadmapUsed=self.isLabeledRoadmapUsed)
@@ -214,14 +216,14 @@ class RearrangementTaskPlanner(object):
                     ### put the object and robot back to the configuration they belong to
                     ### at the beginning of the function call
                     update_success = self.serviceCall_updateCertainObjectPose(
-                                            obj_idx, object_curr_pos, object_curr_position_idx)
+                        obj_idx, object_curr_pos, object_curr_position_idx, object_collision_position_idx)
                     update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
                     update_success = self.serviceCall_updateManipulationStatus("Right_torso")
             else:
                 ### put the object and robot back to the configuration they belong to
                 ### at the beginning of the function call
                 update_success = self.serviceCall_updateCertainObjectPose(
-                                        obj_idx, object_curr_pos, object_curr_position_idx)
+                    obj_idx, object_curr_pos, object_curr_position_idx, object_collision_position_idx)
                 update_success = self.serviceCall_resetRobotCurrConfig(robot_curr_config)
                 update_success = self.serviceCall_updateManipulationStatus("Right_torso")
 

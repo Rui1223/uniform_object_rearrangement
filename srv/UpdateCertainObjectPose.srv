@@ -4,5 +4,6 @@
 int32 object_idx
 geometry_msgs/Point target_pose
 int32 object_position_idx
+int32 object_collision_position_idx
 ---
 bool success
