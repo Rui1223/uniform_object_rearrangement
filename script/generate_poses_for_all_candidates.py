@@ -21,7 +21,7 @@ def main(args):
     pybullet_plan_scene = PybulletPlanScene(args)
 
     ### first geneate all position candidates
-    pybullet_plan_scene.workspace_p.generateCandidatesGeometry()
+    # pybullet_plan_scene.workspace_p.generateCandidatesGeometry()
     pybullet_plan_scene.generatePosesForAllCandidates("Right_torso")
 
     time.sleep(10000)

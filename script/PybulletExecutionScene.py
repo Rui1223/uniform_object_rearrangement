@@ -44,8 +44,6 @@ class PybulletExecutionScene(object):
         standingBase_dim, table_dim, table_offset_x, \
         camera_extrinsic, camera_intrinsic, \
         cylinder_radius, cylinder_height, \
-        discretization_x, discretization_y, \
-        object_interval_x, object_interval_y, \
         side_clearance_x, side_clearance_y, \
         ceiling_height, thickness_flank, \
         object_mesh_path = self.readROSParam()
@@ -68,9 +66,7 @@ class PybulletExecutionScene(object):
         self.setupWorkspace(standingBase_dim, table_dim, table_offset_x, object_mesh_path, True)
         self.workspace_e.addConstrainedArea(ceiling_height, thickness_flank)
         self.workspace_e.setDeploymentParam(
-                cylinder_radius, cylinder_height, discretization_x, discretization_y, \
-                object_interval_x, object_interval_y, side_clearance_x, side_clearance_y)
-        self.workspace_e.deployAllPositionCandidates()
+                cylinder_radius, cylinder_height, side_clearance_x, side_clearance_y)
         self.setupCamera(camera_extrinsic, camera_intrinsic)
 
         ### create an executor assistant
@@ -113,7 +109,7 @@ class PybulletExecutionScene(object):
             self.executingClientID
         )
 
-    
+
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
         ### and initialize a ros node
@@ -246,22 +242,6 @@ class PybulletExecutionScene(object):
             rospy.sleep(0.2)
         cylinder_height = rospy.get_param('/uniform_cylinder_object/height')
 
-        while not rospy.has_param('/object_goal_deployment/discretization_x'):
-            rospy.sleep(0.2)
-        discretization_x = rospy.get_param('/object_goal_deployment/discretization_x')
-
-        while not rospy.has_param('/object_goal_deployment/discretization_y'):
-            rospy.sleep(0.2)
-        discretization_y = rospy.get_param('/object_goal_deployment/discretization_y')
-
-        while not rospy.has_param('/object_goal_deployment/object_interval_x'):
-            rospy.sleep(0.2)
-        object_interval_x = rospy.get_param('/object_goal_deployment/object_interval_x')
-
-        while not rospy.has_param('/object_goal_deployment/object_interval_y'):
-            rospy.sleep(0.2)
-        object_interval_y = rospy.get_param('/object_goal_deployment/object_interval_y')
-
         while not rospy.has_param('/object_goal_deployment/side_clearance_x'):
             rospy.sleep(0.2)
         side_clearance_x = rospy.get_param('/object_goal_deployment/side_clearance_x')
@@ -287,8 +267,6 @@ class PybulletExecutionScene(object):
             standingBase_dim, table_dim, table_offset_x, \
             camera_extrinsic, camera_intrinsic, \
             cylinder_radius, cylinder_height, \
-            discretization_x, discretization_y, \
-            object_interval_x, object_interval_y, \
             side_clearance_x, side_clearance_y, \
             ceiling_height, thickness_flank, \
             object_mesh_path

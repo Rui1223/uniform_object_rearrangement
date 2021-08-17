@@ -169,159 +169,145 @@ class WorkspaceTable(object):
         ###########################################################################################
 
     def setDeploymentParam(self, 
-            cylinder_radius, cylinder_height, discretization_x, discretization_y, 
-            object_interval_x, object_interval_y, side_clearance_x, side_clearance_y):
+            cylinder_radius, cylinder_height, side_clearance_x, side_clearance_y, 
+            discretization_x=None, discretization_y=None, object_interval_x=None, object_interval_y=None):
         self.cylinder_radius = cylinder_radius
         self.cylinder_height = cylinder_height
+        self.side_clearance_x = side_clearance_x
+        self.side_clearance_y = side_clearance_y
         self.discretization_x = discretization_x
         self.discretization_y = discretization_y
         self.object_interval_x = object_interval_x
         self.object_interval_y = object_interval_y
-        self.side_clearance_x = side_clearance_x
-        self.side_clearance_y = side_clearance_y
 
     def generateInstance_cylinders(self, num_objects):
         ### return: success (bool)
-
         self.num_objects = num_objects ### obtain the number of objects
         print("--------generate an instance---------")
         cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
-                                    radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
-
+                                                radius=self.cylinder_radius, height=self.cylinder_height, 
+                                                physicsClientId=self.server)
         for obj_i in range(self.num_objects):
+            rgbacolor = self.color_pools[obj_i] + [1.0] ### No transparency
+            cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                                                radius=self.cylinder_radius, length=self.cylinder_height, 
+                                                rgbaColor=rgbacolor, physicsClientId=self.server)
             isCollision = True
             timeout = 20
             while isCollision and timeout > 0:
                 print("generate the {}th object".format(obj_i))
                 timeout -= 1
-                ### generate the center of an object with uniform distribution
-                ### uniform_x(0.89, 1.235), uniform_y(-0.605, 0.585)
-                # start_pos = [
-                #     round(uniform(self.constrained_area_x_limit[0] + 0.02 + self.cylinder_radius, \
-                #                     self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius - 0.02), 3),
-                #     round(uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
-                #                     self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius - 0.02), 3),
-                #     round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)
-                # ]
-                # rgbacolor = [round(random(), 3), round(random(), 3), round(random(), 3), 1.0]
-
-                ### uniform_x(0.87, 1.255), uniform_y(-0.605, 0.605)
                 start_pos = [
                     round(uniform(self.constrained_area_x_limit[0] + self.cylinder_radius, \
-                                    self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius), 3),
+                            self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius), 3),
                     round(uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
-                                    self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius), 3),
+                            self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius), 3),
                     round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)
                 ]
-                rgbacolor = self.color_pools[obj_i] + [1.0] ### No transparency
-                cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-                                radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=rgbacolor, physicsClientId=self.server)
                 cylinder_objectM = p.createMultiBody(
-                    baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v,
-                    basePosition=start_pos, physicsClientId=self.server)
+                            baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v,
+                            basePosition=start_pos, physicsClientId=self.server)
                 isCollision = self.collisionAgent.collisionCheck_instance_cylinder_objects(
-                                        cylinder_objectM, [obj_geo.geo for obj_geo in self.object_geometries.values()], self.cylinder_radius)
+                    cylinder_objectM, [obj_geo.geo for obj_geo in self.object_geometries.values()], self.cylinder_radius)
                 if isCollision:
                     ### remove that mesh as it is invalid (collision with existing object meshes)
                     p.removeBody(cylinder_objectM)
-            
             if isCollision:
+                ### could not fit in this object, the instance generation fails...
                 return False
             else:
                 ### congrats, the object's location is accepted
-                ### assign the start position to the closest candidate position
-                start_position_idx = self.assignToNearestCandiate(start_pos)
                 self.object_geometries[obj_i] = CylinderObject(
-                            obj_i, start_pos, start_position_idx, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
+                    obj_i, start_pos, cylinder_objectM, self.cylinder_radius, self.cylinder_height)
 
-        ### assign goal positions
-        self.assignGoalPositions()
-        self.goal_visualization_mesh = OrderedDict() ### obj_idx (key): [position_idx, mesh] (value)
-        for obj_idx, position_idx in self.all_goal_positions.items():
-            self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx) ### assign goal position
-            ### visualize it for confirmation
-            temp_rgbacolor = self.color_pools[obj_idx] + [0.25]
-            temp_cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-                    radius=self.cylinder_radius, length=self.cylinder_height, 
-                    rgbaColor=temp_rgbacolor, physicsClientId=self.server)
-            temp_cylinder_objectM = p.createMultiBody(
-                    baseVisualShapeIndex=temp_cylinder_v,
-                basePosition=self.all_position_candidates[position_idx], physicsClientId=self.server)
-            self.goal_visualization_mesh[obj_idx] = [position_idx, temp_cylinder_objectM]
-
-        ############## printing test ##############
+        ############## print to confirm ##############
         for obj_idx in range(self.num_objects):
             print(obj_idx)
             print(self.object_geometries[obj_idx].curr_pos)
-            print(self.object_geometries[obj_idx].curr_position_idx)
-            print(self.object_geometries[obj_idx].goal_pos)
-            print(self.object_geometries[obj_idx].goal_position_idx)
-            print(self.object_geometries[obj_idx].rgbacolor)
-        ###########################################
-        
+        ##############################################
         return True
 
 
     def reproduceInstance_cylinders(self, cylinder_objects):
         ### input: cylinder_objects (CylinderObj[])
         ### output: success (bool)
-
         print("--------reproduce an instance---------")
+        self.num_objects = len(cylinder_objects)
+        ### first assign goal positions
+        self.assignGoalPositions()
+        self.goal_visualization_mesh = OrderedDict() ### obj_idx (key): mesh (value)
 
+        counter = 0
         for cylinder_obj in cylinder_objects:
+            obj_idx = cylinder_obj.obj_idx
+            cylinder_curr_position = [cylinder_obj.curr_position.x, cylinder_obj.curr_position.y, cylinder_obj.curr_position.z]
             cylinder_radius = round(cylinder_obj.radius, 3)
             cylinder_height = round(cylinder_obj.height, 3)
-            cylinder_rgbacolor = [
-                round(cylinder_obj.rgbacolor.r, 3), round(cylinder_obj.rgbacolor.g, 3), 
-                round(cylinder_obj.rgbacolor.b, 3), round(cylinder_obj.rgbacolor.a, 3)]
-            cylinder_curr_position = [cylinder_obj.curr_position.x, cylinder_obj.curr_position.y, cylinder_obj.curr_position.z]
-            cylinder_curr_position_idx = cylinder_obj.curr_position_idx
-            cylinder_goal_position = [cylinder_obj.goal_position.x, cylinder_obj.goal_position.y, cylinder_obj.goal_position.z]
-            cylinder_goal_position_idx = cylinder_obj.goal_position_idx
+            cylinder_rgbacolor_start = self.color_pools[obj_idx] + [1.0] ### concrete color
+
+            ############################################ generate object current mesh ##################################################
             cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
                 radius=cylinder_radius, height=cylinder_height, physicsClientId=self.server)
             cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-                radius=cylinder_radius, length=cylinder_height, rgbaColor=cylinder_rgbacolor, physicsClientId=self.server)
+                radius=cylinder_radius, length=cylinder_height, rgbaColor=cylinder_rgbacolor_start, physicsClientId=self.server)
             cylinder_objectM = p.createMultiBody(baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v,
                 basePosition=cylinder_curr_position, physicsClientId=self.server)
-            self.object_geometries[cylinder_obj.obj_idx] = CylinderObject(
-                cylinder_obj.obj_idx, cylinder_curr_position, cylinder_curr_position_idx, 
-                cylinder_objectM, cylinder_obj.radius, cylinder_obj.height, cylinder_rgbacolor)
-            self.object_geometries[cylinder_obj.obj_idx].setGoalPosition(cylinder_goal_position, cylinder_goal_position_idx)
-        
+            self.object_geometries[obj_idx] = CylinderObject(
+                                    obj_idx, cylinder_curr_position, cylinder_objectM, cylinder_radius, cylinder_height)
+            collision_position_idx = self.assignToNearestCandiate(cylinder_curr_position)
+            self.object_geometries[obj_idx].setCurrPosition(cylinder_curr_position, self.num_candidates+counter, collision_position_idx)
+            #############################################################################################################################
+
+            ######################################### generate goal visualization mesh ##################################################
+            goal_position_idx = self.all_goal_positions[obj_idx]
+            goal_position = self.candidate_geometries[goal_position_idx].pos
+            self.object_geometries[obj_idx].setGoalPosition(goal_position, goal_position_idx)
+            cylinder_rgbacolor_goal = self.color_pools[obj_idx] + [0.35] ### transparent color
+            cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                radius=cylinder_radius, length=cylinder_height, rgbaColor=cylinder_rgbacolor_goal, physicsClientId=self.server)
+            cylinder_objectM = p.createMultiBody(baseVisualShapeIndex=cylinder_v,
+                            basePosition=goal_position, physicsClientId=self.server) ### only visualization
+            self.goal_visualization_mesh[obj_idx] = cylinder_objectM
+            #############################################################################################################################
+            counter += 1
+
+        ###### print test ######
+        for obj_idx, object_info in self.object_geometries.items():
+            print(obj_idx)
+            print("object_index: " + str(object_info.object_index))
+            print("cylinder_radius: " + str(object_info.cylinder_radius))
+            print("cylinder_height: " + str(object_info.cylinder_height))
+            print("geo: " + str(object_info.geo))
+            print("curr_pos: " + str(object_info.curr_pos))
+            print("curr_position_idx: " + str(object_info.curr_position_idx))
+            print("collision_position_idx: " + str(object_info.collision_position_idx))
+            print("goal_pos: " + str(object_info.goal_pos))
+            print("goal_position_idx: " + str(object_info.goal_position_idx))
+            print("\n")
+
         return True
 
     
     def obtainCylinderObjectsInfo(self):
         cylinder_objects = []
-        for obj_i in range(self.num_objects):
+        for object_info in self.object_geometries.values():
             cylinder_object = CylinderObj()
             ### fill in the data
-            cylinder_object.obj_idx = obj_i
-            cylinder_object.curr_position.x = self.object_geometries[obj_i].curr_pos[0]
-            cylinder_object.curr_position.y = self.object_geometries[obj_i].curr_pos[1]
-            cylinder_object.curr_position.z = self.object_geometries[obj_i].curr_pos[2]
-            cylinder_object.curr_position_idx = self.object_geometries[obj_i].curr_position_idx
-            cylinder_object.goal_position.x = self.object_geometries[obj_i].goal_pos[0]
-            cylinder_object.goal_position.y = self.object_geometries[obj_i].goal_pos[1]
-            cylinder_object.goal_position.z = self.object_geometries[obj_i].goal_pos[2]
-            cylinder_object.goal_position_idx = self.object_geometries[obj_i].goal_position_idx
-            cylinder_object.radius = self.cylinder_radius
-            cylinder_object.height = self.cylinder_height
-            cylinder_object.rgbacolor.r = self.object_geometries[obj_i].rgbacolor[0]
-            cylinder_object.rgbacolor.g = self.object_geometries[obj_i].rgbacolor[1]
-            cylinder_object.rgbacolor.b = self.object_geometries[obj_i].rgbacolor[2]
-            cylinder_object.rgbacolor.a = self.object_geometries[obj_i].rgbacolor[3]
+            cylinder_object.obj_idx = object_info.object_index
+            cylinder_object.curr_position.x = object_info.curr_pos[0]
+            cylinder_object.curr_position.y = object_info.curr_pos[1]
+            cylinder_object.curr_position.z = object_info.curr_pos[2]
+            cylinder_object.radius = object_info.cylinder_radius
+            cylinder_object.height = object_info.cylinder_height
             cylinder_objects.append(cylinder_object)
         return cylinder_objects
 
 
     def loadInstance_cylinders(self, num_objects, instance_number):
-
         instanceFile = os.path.join(self.rosPackagePath, "examples", str(num_objects)) + "/" + str(instance_number) + ".txt"
         print("--------load an instance---------")
         self.cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
-                                    radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
+            radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
         self.num_objects = 0
         counter = 0
         f_instance = open(instanceFile, "r")
@@ -334,55 +320,41 @@ class WorkspaceTable(object):
                 ### that's current/start position for that object
                 start_pos = [float(i) for i in line]
                 ### create the visualization mesh of the object
-                object_rgbacolor_start = self.color_pools[obj_idx] + [1.0]
+                object_rgbacolor = self.color_pools[obj_idx] + [1.0]
                 cylinder_start_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-                    radius=self.cylinder_radius, length=self.cylinder_height, 
-                    rgbaColor=object_rgbacolor_start, physicsClientId=self.server)
-                cylinder_objectM_start = p.createMultiBody(
+                            radius=self.cylinder_radius, length=self.cylinder_height, 
+                            rgbaColor=object_rgbacolor, physicsClientId=self.server)
+                cylinder_objectM = p.createMultiBody(
                     baseCollisionShapeIndex=self.cylinder_c, baseVisualShapeIndex=cylinder_start_v,
                     basePosition=start_pos, physicsClientId=self.server)
-                start_position_idx = self.assignToNearestCandiate(start_pos)
                 self.object_geometries[obj_idx] = CylinderObject(
-                    obj_idx, start_pos, start_position_idx, cylinder_objectM_start, \
-                        self.cylinder_radius, self.cylinder_height, object_rgbacolor_start)
+                    obj_idx, start_pos, cylinder_objectM, self.cylinder_radius, self.cylinder_height)
                 self.num_objects += 1
             ### before the next loop
             counter += 1
         f_instance.close()
 
-        ### now assign the goal positions and visualize them
-        self.assignGoalPositions()
-        self.goal_visualization_mesh = OrderedDict() ### obj_idx (key): [position_idx, mesh] (value)
-        for obj_idx, position_idx in self.all_goal_positions.items():
-            self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx) ### assign goal position
-            ### visualize it for confirmation
-            temp_rgbacolor = self.color_pools[obj_idx] + [0.25]
-            temp_cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-                    radius=self.cylinder_radius, length=self.cylinder_height, 
-                    rgbaColor=temp_rgbacolor, physicsClientId=self.server)
-            temp_cylinder_objectM = p.createMultiBody(
-                baseVisualShapeIndex=temp_cylinder_v,
-                basePosition=self.all_position_candidates[position_idx], physicsClientId=self.server)
-            self.goal_visualization_mesh[obj_idx] = [position_idx, temp_cylinder_objectM]
-
-        ############## printing test ##############
+        ############## print to confirm ##############
         for obj_idx in range(self.num_objects):
             print(obj_idx)
             print(self.object_geometries[obj_idx].curr_pos)
-            print(self.object_geometries[obj_idx].curr_position_idx)
-            print(self.object_geometries[obj_idx].goal_pos)
-            print(self.object_geometries[obj_idx].goal_position_idx)
-            print(self.object_geometries[obj_idx].rgbacolor)
-        ###########################################
+        ##############################################
         return True
 
 
-    def deployAllPositionCandidates(self, discretization_x=None, discretization_y=None):
-        ################ This function calculate all possible postions (x,y) ################
-        ################### given the constrained area + discretization #####################
+    def deployAllPositionCandidates(self, generateMesh=True, discretization_x=None, discretization_y=None):
+        ################ This function calculates all possible postions (x,y) ################
+        ################### given the constrained area + discretization ######################
+        ############### and generates the candidate meshes if necessary ######################
+        self.candidate_geometries = OrderedDict()
+        cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
+            radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
+        rgbacolor = [0.5, 0.5, 0.5, 0.15]
+        cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+            radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=rgbacolor, physicsClientId=self.server)        
+
         if discretization_x == None: discretization_x = self.discretization_x
         if discretization_y == None: discretization_y = self.discretization_y
-        self.all_position_candidates = OrderedDict()
         ### formula for compute n_y and n_x (number of objects in y and x direction)
         ### 0.02 + r + d_x*(n_x - 1) + (r + sc_x) = |x|
         ### (r + sc_y) + d_y*(n_y - 1) + (r + sc_y) = |y|
@@ -399,15 +371,26 @@ class WorkspaceTable(object):
                     round(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius + discretization_y * y_j, 3),
                     round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)                    
                 ]
-                self.all_position_candidates[candidate_idx] = candidate_pos
+                if generateMesh:
+                    cylinder_objectM = p.createMultiBody(
+                        baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v, \
+                        basePosition=candidate_pos, physicsClientId=self.server)
+                else:
+                    cylinder_objectM = None
+                self.candidate_geometries[candidate_idx] = CylinderCandidate(
+                                    candidate_idx, candidate_pos, cylinder_objectM, self.cylinder_radius, self.cylinder_height)
                 candidate_idx += 1
-        self.positionCandidate_x_limit = [self.all_position_candidates[0][0], self.all_position_candidates[len(self.all_position_candidates)-1][0]]
-        self.positionCandidate_y_limit = [self.all_position_candidates[0][1], self.all_position_candidates[len(self.all_position_candidates)-1][1]]
-        # print("print all position candidates")
-        # print(self.all_position_candidates)
+        self.num_candidates = len(self.candidate_geometries)
+        self.positionCandidate_x_limit = [self.candidate_geometries[0].pos[0], \
+                                          self.candidate_geometries[self.num_candidates-1].pos[0]]
+        self.positionCandidate_y_limit = [self.candidate_geometries[0].pos[1], \
+                                          self.candidate_geometries[self.num_candidates-1].pos[1]]
+        ### printing test
+        # for candidate_idx, cylinder_candidate in self.candidate_geometries.items():
+        #     print(str(candidate_idx) + ": " + str(cylinder_candidate.pos))
 
     def assignGoalPositions(self, object_interval_x=None, object_interval_y=None):
-        ### assign goal positions based on #objects, all_position_candidates
+        ### assign goal positions based on #objects
         ### as well as object_interval_x and object_interval_y
         if object_interval_x == None: object_interval_x = self.object_interval_x
         if object_interval_y == None: object_interval_y = self.object_interval_y
@@ -463,7 +446,7 @@ class WorkspaceTable(object):
         ### find the nearest candidate
         nearest_candidate_dist = np.inf
         for neighbor_idx in potential_neighbor_indexes:
-            temp_dist = utils.computePoseDist_pos(position, self.all_position_candidates[neighbor_idx])
+            temp_dist = utils.computePoseDist_pos(position, self.candidate_geometries[neighbor_idx].pos)
             if temp_dist < nearest_candidate_dist:
                 nearest_candidate_dist = temp_dist
                 nearest_candidate_idx = neighbor_idx
@@ -477,40 +460,6 @@ class WorkspaceTable(object):
             self.object_geometries[obj_idx].geo, position, orientation, physicsClientId=self.server)
         self.object_geometries[obj_idx].curr_pos = position
         self.object_geometries[obj_idx].curr_position_idx = position_idx
-
-    
-    def generateCandidatesGeometry_labeledRoadmap(self):
-        '''This function generates object_geometries on all position candidates'''
-        cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
-            radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
-        rgbacolor = [0.5, 0.5, 0.5, 0.5]
-        cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-            radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=[0.5, 0.5, 0.5, 0.5], physicsClientId=self.server)
-        for candidate_idx, candidate_pos in self.all_position_candidates.items():
-            cylinder_objectM = p.createMultiBody(
-                baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v, basePosition=candidate_pos, physicsClientId=self.server)
-            self.object_geometries[candidate_idx] = CylinderObject(
-                candidate_idx, candidate_pos, candidate_idx, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
-        ### printing test
-        # for candidate_idx, cylinder_object in self.object_geometries.items():
-        #     print(str(candidate_idx) + ": " + str(cylinder_object.curr_pos))
-
-    def generateCandidatesGeometry(self):
-        '''This function generates geometries foe all position candidates'''
-        self.candidate_geometries = OrderedDict()
-        cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
-            radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
-        rgbacolor = [0.5, 0.5, 0.5, 0.5]
-        cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
-            radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=[0.5, 0.5, 0.5, 0.5], physicsClientId=self.server)
-        for candidate_idx, candidate_pos in self.all_position_candidates.items():
-            cylinder_objectM = p.createMultiBody(
-                baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v, basePosition=candidate_pos, physicsClientId=self.server)
-            self.candidate_geometries[candidate_idx] = CylinderCandidate(
-                                candidate_idx, candidate_pos, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
-        ### printing test
-        # for candidate_idx, cylinder_candidate in self.candidate_geometries.items():
-        #     print(str(candidate_idx) + ": " + str(cylinder_candidate.pos))
 
 
     def clear_planning_instance(self):
@@ -526,41 +475,77 @@ class WorkspaceTable(object):
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
         self.object_geometries = OrderedDict()
-        for obj_idx, goal_info in self.goal_visualization_mesh.items():
-            p.removeBody(goal_info[1])
-        self.goal_visualization_mesh = OrderedDict()
-
 
 
 ### general class of object in the workspace
 class AnyObject(object):
-    def __init__(self, index, curr_pos, geo):
+    def __init__(self, index, pos, geo):
         self.object_index = index
-        self.curr_pos = curr_pos
+        self.curr_pos = pos
         self.geo = geo
-
-    def setPos(pos):
-        self.curr_pos = curr_pos
     
 class CylinderObject(AnyObject):
-    def __init__(self, index, curr_pos, curr_position_idx, geo, cylinder_radius, cylinder_height, rgbacolor):
+    def __init__(self, index, pos, geo, cylinder_radius, cylinder_height):
         ### invoking the __init__ of the parent class
-        AnyObject.__init__(self, index, curr_pos, geo)
-        self.curr_position_idx = curr_position_idx
+        AnyObject.__init__(self, index, pos, geo)
         self.cylinder_radius = cylinder_radius
         self.cylinder_height = cylinder_height
-        self.rgbacolor = rgbacolor
+
+    def setCurrPosition(self, curr_pos, curr_position_idx, collision_position_idx):
+        self.curr_pos = curr_pos
+        self.curr_position_idx = curr_position_idx
+        self.collision_position_idx = collision_position_idx
 
     def setGoalPosition(self, goal_pos, goal_position_idx):
         self.goal_pos = goal_pos
         self.goal_position_idx = goal_position_idx
 
 class CylinderCandidate(object):
-    def __init__(self, position_idx, pos, geo, cylinder_radius, cylinder_height, rgbacolor):
+    def __init__(self, position_idx, pos, geo, cylinder_radius, cylinder_height):
         self.position_idx = position_idx
         self.pos = pos
         self.geo = geo
         self.cylinder_radius = cylinder_radius
         self.cylinder_height = cylinder_height
-        self.rgbacolor = rgbacolor
-    ### More functions to be added later (if necessary) ###
+
+
+
+####################################################################################################################
+        # start_position_idx = self.assignToNearestCandiate(start_pos)
+        # self.object_geometries[obj_i] = CylinderObject(
+        #             obj_i, start_pos, start_position_idx, cylinder_objectM, self.cylinder_radius, self.cylinder_height, rgbacolor)
+
+        # ### assign goal positions
+        # self.assignGoalPositions()
+        # self.goal_visualization_mesh = OrderedDict() ### obj_idx (key): [position_idx, mesh] (value)
+        # for obj_idx, position_idx in self.all_goal_positions.items():
+        #     self.object_geometries[obj_idx].setGoalPosition(self.all_position_candidates[position_idx], position_idx) ### assign goal position
+        #     ### visualize it for confirmation
+        #     temp_rgbacolor = self.color_pools[obj_idx] + [0.25]
+        #     temp_cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+        #             radius=self.cylinder_radius, length=self.cylinder_height, 
+        #             rgbaColor=temp_rgbacolor, physicsClientId=self.server)
+        #     temp_cylinder_objectM = p.createMultiBody(
+        #             baseVisualShapeIndex=temp_cylinder_v,
+        #         basePosition=self.all_position_candidates[position_idx], physicsClientId=self.server)
+        #     self.goal_visualization_mesh[obj_idx] = [position_idx, temp_cylinder_objectM]
+####################################################################################################################
+
+
+
+    # def generateCandidatesGeometry(self):
+    #     '''This function generates geometries foe all position candidates'''
+    #     self.candidate_geometries = OrderedDict()
+    #     cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
+    #         radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
+    #     rgbacolor = [0.5, 0.5, 0.5, 0.25]
+    #     cylinder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+    #         radius=self.cylinder_radius, length=self.cylinder_height, rgbaColor=rgbacolor, physicsClientId=self.server)
+    #     for candidate_idx, candidate_pos in self.all_position_candidates.items():
+    #         cylinder_objectM = p.createMultiBody(
+    #             baseCollisionShapeIndex=cylinder_c, baseVisualShapeIndex=cylinder_v, basePosition=candidate_pos, physicsClientId=self.server)
+    #         self.candidate_geometries[candidate_idx] = CylinderCandidate(
+    #                             candidate_idx, candidate_pos, cylinder_objectM, self.cylinder_radius, self.cylinder_height)
+    #     ### printing test
+    #     # for candidate_idx, cylinder_candidate in self.candidate_geometries.items():
+    #     #     print(str(candidate_idx) + ": " + str(cylinder_candidate.pos))

@@ -75,9 +75,9 @@ class PybulletPlanScene(object):
         self.setupWorkspace(standingBase_dim, table_dim, table_offset_x, object_mesh_path, False)
         self.workspace_p.addConstrainedArea(ceiling_height, thickness_flank)
         self.workspace_p.setDeploymentParam(
-                cylinder_radius, cylinder_height, discretization_x, discretization_y, \
-                object_interval_x, object_interval_y, side_clearance_x, side_clearance_y)
-        self.workspace_p.deployAllPositionCandidates()
+                cylinder_radius, cylinder_height, side_clearance_x, side_clearance_y, \
+                discretization_x, discretization_y, object_interval_x, object_interval_y)
+        self.workspace_p.deployAllPositionCandidates(generateMesh=True)
 
         ### create a planner assistant
         self.planner_p = Planner(
@@ -642,6 +642,7 @@ class PybulletPlanScene(object):
             orientations.append(temp_quat)
         return orientations
 
+    #########################################################################################
     def generatePosesForAllCandidates(self, armType):
         self.planner_p.position_candidates_configPoses = OrderedDict()
         cylinder_positions_geometries = {candidate.position_idx : candidate.geo for candidate in self.workspace_p.candidate_geometries.values()}
@@ -677,8 +678,9 @@ class PybulletPlanScene(object):
         ### wooo!!! finished!
         ### save the whole position_candidates_configPoses
         self.planner_p.serializeCandidatesConfigPoses()
+    #########################################################################################
 
-    
+    #########################################################################################
     def calculateReachabilityMap(self, orientation, placeholder_shape="cylinder"):
         ### calculate the reachability map for a particular orientation
         ### mark with the shape of different color specified
@@ -744,6 +746,7 @@ class PybulletPlanScene(object):
         self.robot_p.resetArmConfig_torso(
             self.robot_p.leftArmHomeConfiguration+self.robot_p.rightArmHomeConfiguration, self.robot_p.torsoHomeConfiguration)
         time.sleep(10000)
+        #########################################################################################
 
 
     def readROSParam(self):
