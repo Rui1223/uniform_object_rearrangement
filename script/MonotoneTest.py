@@ -13,6 +13,7 @@ from uniform_object_rearrangement.msg import CylinderObj
 from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderRequest
 from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
+from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsRequest
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
@@ -107,6 +108,17 @@ class MonotoneTester(object):
             return reproduce_instance_cylinder_response.success
         except rospy.ServiceException as e:
             print("reproduce_instance_cylinder service call failed: %s" % e)
+    
+    def serviceCall_generateConfigsForStartPositions(self):
+        rospy.wait_for_service("generate_configs_for_start_positions")
+        request = GenerateConfigsForStartPositionsRequest()
+        try:
+            generateConfigsForStartPositions_proxy = rospy.ServiceProxy(
+                "generate_configs_for_start_positions", GenerateConfigsForStartPositions)
+            generate_configs_for_start_positions_response = generateConfigsForStartPositions_proxy(request)
+            return generate_configs_for_start_positions_response.success
+        except rospy.ServiceException as e:
+            print("generate_configs_for_start_positions service call failed" % e)
 
     def serviceCall_execute_trajectory(self, traj):
         '''call the ExecuteTrajectory service to execute the given trajectory
@@ -197,6 +209,8 @@ def main(args):
         cylinder_objects = monotone_tester.serviceCall_cylinderPositionEstimate()
         ### reproduce the estimated object poses in the planning scene
         reproduce_instance_success = monotone_tester.serviceCall_reproduceInstanceCylinder(cylinder_objects)
+        ### generate IK config for start positions for all objects
+        ik_generate_success = monotone_tester.serviceCall_generateConfigsForStartPositions()
 
         ####### now use the specified method to solve the instance #######
         if monotone_tester.method_name == "DFS_DP_labeled":

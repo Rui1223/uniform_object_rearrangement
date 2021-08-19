@@ -48,6 +48,7 @@ class Planner(object):
         self.loadIKdataset()
         self.deserializeCandidatesConfigPoses()
 
+
     def resetPlannerParams(self):
         self.isObjectInLeftHand = False
         self.isObjectInRightHand = False
@@ -1736,6 +1737,8 @@ class Planner(object):
             if armType == "Left_torso" or armType == "Right_torso":
                 singleArmConfig_IK_grasping = [config_IK[0]] + list(config_IK[first_joint_index:first_joint_index+7])
             self.setRobotToConfig(singleArmConfig_IK_grasping, robot, armType)
+            print("grasp IK: ")
+            print(singleArmConfig_IK_grasping)
             isIKValid, FLAG = self.checkSamplePoseIK(pose, robot, workspace, armType)
             if not isIKValid:
                 tryAgain = True if input("Try another IK for the grasping pose (y/n)?") == 'y' else False
@@ -1764,6 +1767,8 @@ class Planner(object):
             if armType == "Left_torso" or armType == "Right_torso":
                 singleArmConfig_IK_approaching = [q_newPoseIK[0]] + list(q_newPoseIK[first_joint_index:first_joint_index+7])
             self.setRobotToConfig(singleArmConfig_IK_approaching, robot, armType)
+            print("approach IK: ")
+            print(singleArmConfig_IK_approaching)
             isIKValid, FLAG = self.checkSamplePoseIK(new_pose, robot, workspace, armType)
             if not isIKValid:
                 tryAgain = True if input("Try another IK for the grasping pose (y/n)?") == 'y' else False

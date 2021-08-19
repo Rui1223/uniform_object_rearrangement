@@ -70,6 +70,7 @@ add_service_files(
   CylinderPoseEstimate.srv
   CylinderPositionEstimate.srv
   ExecuteTrajectory.srv
+  GenerateConfigsForStartPositions.srv
   GenerateInstanceCylinder.srv
   GetCertainObjectPose.srv
   GetCurrRobotConfig.srv

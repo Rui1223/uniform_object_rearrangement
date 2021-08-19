@@ -27,6 +27,7 @@ import utils
 from uniform_object_rearrangement.msg import ArmTrajectory
 from uniform_object_rearrangement.msg import ObjectRearrangePath
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderResponse
+from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsResponse
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectResponse
 from uniform_object_rearrangement.srv import GetCertainObjectPose, GetCertainObjectPoseResponse
 from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotConfigResponse
@@ -121,6 +122,10 @@ class PybulletPlanScene(object):
             "rearrange_cylinder_object", RearrangeCylinderObject,
             self.rearrange_cylinder_object_callback)
 
+        self.generate_configs_for_start_positions_server = rospy.Service(
+            "generate_configs_for_start_positions", GenerateConfigsForStartPositions,
+            self.generate_configs_for_start_positions_callback)
+
         self.get_certain_object_pose_server = rospy.Service(
             "get_certain_object_pose", GetCertainObjectPose,
             self.get_certain_object_pose_callback)
@@ -157,6 +162,20 @@ class PybulletPlanScene(object):
         else:
             print("fail to reproduce an instance")
         return ReproduceInstanceCylinderResponse(success)
+
+    def generate_configs_for_start_positions_callback(self, req):
+        rospy.logwarn("GENERATE CONFIGS FOR START POSITIONS OF ALL OBJECTS")
+        self.planner_p.object_initial_configPoses = OrderedDict()
+        for obj_idx, obj_initial_info in self.workspace_p.object_initial_infos.items():
+            ### for each object
+            self.planner_p.object_initial_configPoses[obj_idx] = PositionCandidateConfigs(obj_idx)
+            ### first generate graspingPose candidates with different orientations
+            graspingPose_candidates = self.generate_pose_candidates(obj_initial_info.pos)
+            # for pose_id, graspingPose in enumerate(graspingPose_candidates):
+            #     approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
+
+
+
 
     def get_certain_object_pose_callback(self, req):
         ### given the specified object index
@@ -659,7 +678,7 @@ class PybulletPlanScene(object):
         for candidate_idx, cylinder_candidate in self.workspace_p.candidate_geometries.items():
             print("++++++++++++++CANDIDATE_IDX: " + str(candidate_idx) + "++++++++++++++")
             self.planner_p.position_candidates_configPoses[candidate_idx] = PositionCandidateConfigs(candidate_idx)
-            ### first generate graspingPose_candidates with different orientation
+            ### first generate graspingPose_candidates with different orientations
             graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos)
             for pose_id, graspingPose in enumerate(graspingPose_candidates):
                 approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
@@ -688,6 +707,24 @@ class PybulletPlanScene(object):
         ### wooo!!! finished!
         ### save the whole position_candidates_configPoses
         self.planner_p.serializeCandidatesConfigPoses()
+    #########################################################################################
+
+    #########################################################################################
+    def generatePoses_IKdateSet(self, armType):
+        cylinder_positions_geometries = {candidate.position_idx : candidate.geo for candidate in self.workspace_p.candidate_geometries.values()}
+        generateMore = True
+        while(generateMore):
+            candidate_idx = int(input('which candidate_idx are you interested?'))
+            cylinder_candidate = self.workspace_p.candidate_geometries[candidate_idx]
+            print("++++++++++++++CANDIDATE_IDX: " + str(candidate_idx) + "++++++++++++++")
+            ### first generate graspingPose_candidates with different orientations
+            graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos)
+            for pose_id, graspingPose in enumerate(graspingPose_candidates):
+                approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
+                    self.planner_p.generateConfigBasedOnPose_candidates(
+                        graspingPose, self.robot_p, self.workspace_p, armType, cylinder_positions_geometries)
+
+            generateMore = True if input('generate more? (y/n)') == 'y' else False
     #########################################################################################
 
     #########################################################################################
