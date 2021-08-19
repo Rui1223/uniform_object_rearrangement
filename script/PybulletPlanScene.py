@@ -166,16 +166,35 @@ class PybulletPlanScene(object):
     def generate_configs_for_start_positions_callback(self, req):
         rospy.logwarn("GENERATE CONFIGS FOR START POSITIONS OF ALL OBJECTS")
         self.planner_p.object_initial_configPoses = OrderedDict()
+        cylinder_positions_geometries = {candidate.position_idx : candidate.geo for candidate in self.workspace_p.candidate_geometries.values()}
         for obj_idx, obj_initial_info in self.workspace_p.object_initial_infos.items():
             ### for each object
             self.planner_p.object_initial_configPoses[obj_idx] = PositionCandidateConfigs(obj_idx)
             ### first generate graspingPose candidates with different orientations
             graspingPose_candidates = self.generate_pose_candidates(obj_initial_info.pos)
-            # for pose_id, graspingPose in enumerate(graspingPose_candidates):
-            #     approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
-
-
-
+            for pose_id, graspingPose in enumerate(graspingPose_candidates):
+                approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
+                    self.planner_p.generateConfigBasedOnPose_initialPositions(
+                        graspingPose, self.robot_p, self.workspace_p, req.armType, cylinder_positions_geometries)
+                if approaching_config != []:
+                    self.planner_p.object_initial_configPoses[obj_idx].approaching_configs.append(approaching_config)
+                    self.planner_p.object_initial_configPoses[obj_idx].grasping_configs.append(grasping_config)
+                    self.planner_p.object_initial_configPoses[obj_idx].approaching_labels.append(approaching_label)
+                    self.planner_p.object_initial_configPoses[obj_idx].grasping_labels.append(grasping_label)
+                    self.planner_p.object_initial_configPoses[obj_idx].total_labels.append(total_label)
+        print("========= finish generate all object_initial_configPoses =========")
+        ### put the robot back to home configuration please
+        self.robot_p.resetRobotToHomeConfiguration()
+        ### uncomment below printing utility if you need debug ###
+        # for obj_idx, object_initial_configs in self.planner_p.object_initial_configPoses.items():
+        #     print(obj_idx)
+        #     print("approaching_configs: " + str(object_initial_configs.approaching_configs))
+        #     print("grasping_configs: " + str(object_initial_configs.grasping_configs))
+        #     print("approaching_labels: " + str(object_initial_configs.approaching_labels))
+        #     print("grasping_labels: " + str(object_initial_configs.grasping_labels))
+        #     print("total_labels: " + str(object_initial_configs.total_labels))
+        #     print("\n")
+        return GenerateConfigsForStartPositionsResponse(True)
 
     def get_certain_object_pose_callback(self, req):
         ### given the specified object index

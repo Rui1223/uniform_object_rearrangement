@@ -109,13 +109,14 @@ class MonotoneTester(object):
         except rospy.ServiceException as e:
             print("reproduce_instance_cylinder service call failed: %s" % e)
     
-    def serviceCall_generateConfigsForStartPositions(self):
+    def serviceCall_generateConfigsForStartPositions(self, armType):
         rospy.wait_for_service("generate_configs_for_start_positions")
         request = GenerateConfigsForStartPositionsRequest()
+        request.armType = armType
         try:
             generateConfigsForStartPositions_proxy = rospy.ServiceProxy(
                 "generate_configs_for_start_positions", GenerateConfigsForStartPositions)
-            generate_configs_for_start_positions_response = generateConfigsForStartPositions_proxy(request)
+            generate_configs_for_start_positions_response = generateConfigsForStartPositions_proxy(request.armType)
             return generate_configs_for_start_positions_response.success
         except rospy.ServiceException as e:
             print("generate_configs_for_start_positions service call failed" % e)
@@ -210,7 +211,9 @@ def main(args):
         ### reproduce the estimated object poses in the planning scene
         reproduce_instance_success = monotone_tester.serviceCall_reproduceInstanceCylinder(cylinder_objects)
         ### generate IK config for start positions for all objects
-        ik_generate_success = monotone_tester.serviceCall_generateConfigsForStartPositions()
+        ik_generate_start_time = time.time()
+        ik_generate_success = monotone_tester.serviceCall_generateConfigsForStartPositions("Right_torso")
+        print("time for generating configs for all start positions: " + str(time.time() - ik_generate_start_time))
 
         ####### now use the specified method to solve the instance #######
         if monotone_tester.method_name == "DFS_DP_labeled":

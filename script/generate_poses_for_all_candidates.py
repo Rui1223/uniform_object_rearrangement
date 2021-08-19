@@ -23,7 +23,7 @@ def main(args):
     ### first geneate all position candidates
     # pybullet_plan_scene.workspace_p.generateCandidatesGeometry()
     pybullet_plan_scene.generatePosesForAllCandidates("Right_torso")
-    pybullet_plan_scene.generatePoses_IKdateSet("Right_torso")
+    # pybullet_plan_scene.generatePoses_IKdateSet("Right_torso")
 
     time.sleep(10000)
 
