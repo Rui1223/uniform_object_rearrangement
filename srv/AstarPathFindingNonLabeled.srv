@@ -1,4 +1,4 @@
-# This srv file defines the service for astar path finding
+# This srv file defines the service for astar path finding on non-labeled roadmap
 # given the start and the goal node (query)
 # and their connected neighbors
 

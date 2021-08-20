@@ -22,7 +22,7 @@ from CollisionChecker import CollisionChecker
 
 import rospy
 from rospkg import RosPack
-from uniform_object_rearrangement.srv import AstarPathFinding, AstarPathFindingRequest
+from uniform_object_rearrangement.srv import AstarPathFindingNonLabeled, AstarPathFindingNonLabeledRequest
 from uniform_object_rearrangement.srv import AstarPathFindingLabeled, AstarPathFindingLabeledRequest
 from uniform_object_rearrangement.msg import Edge
 
@@ -891,16 +891,31 @@ class Planner(object):
                 config_edge_traj.append(intermNode)
 
         return config_edge_traj
+    
+    def AstarPathFinding(self, initialConfig, targetConfig,
+                start_neighbors_idx, start_neighbors_cost, 
+                goal_neighbors_idx, goal_neighbors_cost,
+                robot, workspace, armType, isLabeledRoadmapUsed):
+        if isLabeledRoadmapUsed:
+            traj = self.AstarPathFinding_labeledVersion(initialConfig, targetConfig,
+                start_neighbors_idx, start_neighbors_cost, 
+                goal_neighbors_idx, goal_neighbors_cost,
+                robot, workspace, armType)
+        else:
+            traj = self.AstarPathFinding_nonLabeledVersion(initialConfig, targetConfig,
+                start_neighbors_idx, start_neighbors_cost, 
+                goal_neighbors_idx, goal_neighbors_cost,
+                robot, workspace, armType)
+        return traj
 
-
-    def serviceCall_astarPathFinding(self, 
+    def serviceCall_astarPathFinding_nonLabeledVersion(self, 
             violated_edges, initialConfig, targetConfig, 
             start_neighbors_idx, goal_neighbors_idx, start_neighbors_cost, goal_neighbors_cost,
             robot, workspace, armType):
         ### violated_edges: [Edge(), Edge(), ...]
-        ### prepare the astarPathFindingRequest
-        rospy.wait_for_service("astar_path_finding")
-        request = AstarPathFindingRequest()
+        ### prepare the AstarPathFindingNonLabeledRequest
+        rospy.wait_for_service("astar_path_finding_nonlabeled")
+        request = AstarPathFindingNonLabeledRequest()
         request.query_idx = self.query_idx
         request.start_idx = self.nsamples
         request.goal_idx = self.nsamples + 1
@@ -914,8 +929,8 @@ class Planner(object):
         request.goal_neighbors_cost = goal_neighbors_cost
 
         try:
-            astarSearch = rospy.ServiceProxy("astar_path_finding", AstarPathFinding)
-            response = astarSearch(request.query_idx, 
+            astarSearchNonLabeled = rospy.ServiceProxy("astar_path_finding_nonlabeled", AstarPathFindingNonLabeled)
+            response = astarSearchNonLabeled(request.query_idx, 
                 request.start_idx, request.goal_idx,
                 request.start_config, request.goal_config,
                 request.start_neighbors_idx, request.goal_neighbors_idx,
@@ -926,7 +941,7 @@ class Planner(object):
             print("Service call failed: %s" % e)
 
 
-    def AstarPathFinding(self, initialConfig, targetConfig,
+    def AstarPathFinding_nonLabeledVersion(self, initialConfig, targetConfig,
                 start_neighbors_idx, start_neighbors_cost, 
                 goal_neighbors_idx, goal_neighbors_cost,
                 robot, workspace, armType):
@@ -945,12 +960,12 @@ class Planner(object):
             counter += 1
             ### trigger new call within the same query idx
             # start_time = time.time()
-            searchSuccess, path =  self.serviceCall_astarPathFinding(
+            searchSuccess, path =  self.serviceCall_astarPathFinding_nonLabeledVersion(
                     violated_edges, initialConfig, targetConfig, 
                     start_neighbors_idx, goal_neighbors_idx,
                     start_neighbors_cost, goal_neighbors_cost,
                     robot, workspace, armType)
-            # print("Time for service call for astarPathFinding: {}".format(time.time() - start_time))
+            # print("Time for service call for astarPathFinding_nonLabeledVersion: {}".format(time.time() - start_time))
             if searchSuccess == False:
                 print("the plan fails at the " + str(counter) + "th trial...")
                 ### the plan fails, could not find a solution
@@ -1626,7 +1641,7 @@ class Planner(object):
                     start_neighbors_cost, goal_neighbors_cost,
                     occupied_labels, isInHandManipulation, 
                     robot, workspace, armType)
-            # print("Time for service call for astarPathFinding: {}".format(time.time() - start_time))
+            # print("Time for service call for astarPathFinding_labeledVersion: {}".format(time.time() - start_time))
             if searchSuccess == False:
                 print("the plan fails at the " + str(counter) + "th trial...")
                 ### the plan fails, could not find a solution
@@ -1668,7 +1683,7 @@ class Planner(object):
             occupied_labels, isInHandManipulation, 
             robot, workspace, armType):
         ### violated_edges: [Edge(), Edge(), ...]
-        ### prepare the astarPathFindingRequest
+        ### prepare the AstarPathFindingLabeledRequest
         rospy.wait_for_service("astar_path_finding_labeled")
         request = AstarPathFindingLabeledRequest()
         request.query_idx = self.query_idx
@@ -1698,7 +1713,7 @@ class Planner(object):
         except rospy.ServiceException as e:
             print("Service call failed: %s" % e)
 
-
+    ###################################################################################################################
     def generateConfigBasedOnPose_candidates(self, pose, robot, workspace, armType, cylinder_positions_geometries):
         ### This function generates IK for a pose and check the IK
         ### in term of reachablity, essential collisions, as well as labels
@@ -1809,7 +1824,9 @@ class Planner(object):
             else:
                 return approaching_config_candidates[pose_id], grasping_config_candidates[pose_id], \
                     approaching_labels[pose_id], grasping_labels[pose_id], total_labels[pose_id]
+    ###################################################################################################################
     
+    ###################################################################################################################
     def generateConfigBasedOnPose_initialPositions(self, pose, robot, workspace, armType, cylinder_positions_geometries):
         ### This function generates IK for a pose and check the IK
         ### in term of reachablity, essential collisions, as well as labels
@@ -1888,15 +1905,13 @@ class Planner(object):
                 self.checkConfig_CollisionBetweenRobotAndStaticObjects_labeled(robot, cylinder_positions_geometries)
             # print("Labels for approaching pose: ", objectCollided_approaching)
 
-
-        
         ### out of the loop
         if not isIKValid:
             return [],[],set(), set(), set()
         else:
             return singleArmConfig_IK_approaching, singleArmConfig_IK_grasping, \
                 set(objectCollided_approaching), set(objectCollided_grasping), set(objectCollided_approaching+objectCollided_grasping)
-
+    ###################################################################################################################
 
 
     def serializeCandidatesConfigPoses(self):

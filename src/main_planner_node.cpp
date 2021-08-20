@@ -4,8 +4,8 @@
 #include <cstdlib>
 #include <ros/ros.h>
 #include <ros/package.h>
-#include <uniform_object_rearrangement/AstarPathFinding.h>
 #include <uniform_object_rearrangement/AstarPathFindingLabeled.h>
+#include <uniform_object_rearrangement/AstarPathFindingNonLabeled.h>
 #include <uniform_object_rearrangement/ResetRoadmap.h>
 
 #include "Graph.hpp"
@@ -32,14 +32,14 @@ public:
         m_right_torso_g.constructGraph(right_torso_samples_file, right_torso_connections_file);
     }
 
-    bool astarSolverCallback(
-        uniform_object_rearrangement::AstarPathFinding::Request &req,
-        uniform_object_rearrangement::AstarPathFinding::Response &resp) 
+    bool astarSolverNonLabeledCallback(
+        uniform_object_rearrangement::AstarPathFindingNonLabeled::Request &req,
+        uniform_object_rearrangement::AstarPathFindingNonLabeled::Response &resp) 
     {
         if (req.armType == "Right_torso"){
             if (m_astar_solver.getQueryIdx() != req.query_idx) {
                 // this is a new query, let's set the new query
-                m_astar_solver.setPlanningQuery(m_right_torso_g, req.query_idx, 
+                m_astar_solver.setPlanningQuery_nonLabeled(m_right_torso_g, req.query_idx, 
                     req.start_idx, req.goal_idx, req.start_config, req.goal_config,
                     req.start_neighbors_idx, req.goal_neighbors_idx,
                     req.start_neighbors_cost, req.goal_neighbors_cost,
@@ -47,7 +47,7 @@ public:
             }
             m_right_torso_g.modifyEdge(req.violated_edges, req.query_idx);
             m_astar_solver.prepareToSearch(m_right_torso_g);
-            m_astar_solver.Astar_search(m_right_torso_g);
+            m_astar_solver.Astar_search_nonLabeled(m_right_torso_g);
         }
         // let's return the response after a search
         resp.searchSuccess = m_astar_solver.getSearchSuccessInfo();
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
     std::cout << "time to load graph with " << planner.m_right_torso_g.getnNodes() << " nodes is " << t.elapsed() << "\n";
 
     // claim service the node provide (server)
-    ros::ServiceServer astar_server = nh.advertiseService("astar_path_finding", &Planner_t::astarSolverCallback, &planner);
+    ros::ServiceServer astar_nonlabeled_server = nh.advertiseService("astar_path_finding_nonlabeled", &Planner_t::astarSolverNonLabeledCallback, &planner);
     ros::ServiceServer astar_labeled_server = nh.advertiseService("astar_path_finding_labeled", &Planner_t::astarSolverLabeledCallback, &planner);
     ros::ServiceServer reset_roadmap_server = nh.advertiseService("reset_roadmap", &Planner_t::resetRoadmapCallback, &planner);
 

@@ -26,7 +26,7 @@ with specified start and goal */
 // }
 
 
-void AstarSolver_t::setPlanningQuery(Graph_t &g, int query_idx, 
+void AstarSolver_t::setPlanningQuery_nonLabeled(Graph_t &g, int query_idx, 
         int start_idx, int goal_idx, std::vector<float> start_config, std::vector<float> goal_config,
         std::vector<int> start_neighbors_idx, std::vector<int> goal_neighbors_idx,
         std::vector<float> start_neighbors_cost, std::vector<float> goal_neighbors_cost,
@@ -157,7 +157,7 @@ float AstarSolver_t::computeDist(std::vector<float> state1, std::vector<float> s
 }
 
 
-void AstarSolver_t::Astar_search(Graph_t &g)
+void AstarSolver_t::Astar_search_nonLabeled(Graph_t &g)
 {
     while (!m_open.empty()){
         AstarNode_t *current = m_open.top();

@@ -223,12 +223,12 @@ def main(args):
             planning_time = time.time() - start_time
             print("Time for DFS_DP_labeled planning is: {}".format(planning_time))
 
-        if monotone_tester.method_name == "DFS_DP":
+        if monotone_tester.method_name == "DFS_DP_nonlabeled":
             start_time = time.time()
             TASK_SUCCESS, object_ordering = \
                 rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
             planning_time = time.time() - start_time
-            print("Time for DFS_DP planning is: {}".format(planning_time))
+            print("Time for DFS_DP_nonlabeled planning is: {}".format(planning_time))
 
         if monotone_tester.method_name == "mRS_labeled":
             start_time = time.time()
@@ -237,12 +237,12 @@ def main(args):
             planning_time = time.time() - start_time
             print("Time for mRS_labeled planning is: {}".format(planning_time))
 
-        if monotone_tester.method_name == "mRS":
+        if monotone_tester.method_name == "mRS_nonlabeled":
             start_time = time.time()
             TASK_SUCCESS, object_ordering = \
                 rearrangement_task_planner.mRS_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
             planning_time = time.time() - start_time
-            print("Time for mRS planning is: {}".format(planning_time))
+            print("Time for mRS_nonlabeled planning is: {}".format(planning_time))
 
         saveInstanceAndSolution = True if input("save instance & solution?(y/n)") == 'y' else False
         print("save instance and solution: " + str(saveInstanceAndSolution))

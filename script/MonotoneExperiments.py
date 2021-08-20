@@ -14,6 +14,7 @@ from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateI
 from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
 from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsRequest
+from uniform_object_rearrangement.srv import ResetPlanningInstance, ResetPlanningInstanceRequest
 from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceRequest
 from uniform_object_rearrangement.srv import ClearExecutionInstance, ClearExecutionInstanceRequest
 from uniform_object_rearrangement.srv import ResetRoadmap, ResetRoadmapRequest
@@ -31,7 +32,7 @@ class MonotoneExperimenter(object):
         self.ExperimentsFolder = os.path.join(self.rosPackagePath, "monotone_experiments")
         if not os.path.exists(self.ExperimentsFolder):
             os.makedirs(self.ExperimentsFolder)
-        self.numObjects_options = [6, 8]
+        self.numObjects_options = [6]
         self.numExperiments_perObject = int(args[1])
         self.maxInstancesNeed_perObject = int(args[2])
 
@@ -117,6 +118,16 @@ class MonotoneExperimenter(object):
             return generate_configs_for_start_positions_response.success
         except rospy.ServiceException as e:
             print("generate_configs_for_start_positions service call failed" % e)
+
+    def serviceCall_reset_planning_instance(self):
+        rospy.wait_for_service("reset_planning_instance")
+        request = ResetPlanningInstanceRequest()
+        try:
+            resetPlanningInstance_proxy = rospy.ServiceProxy("reset_planning_instance", ResetPlanningInstance)
+            reset_planning_instance_response = resetPlanningInstance_proxy(request)
+            return reset_planning_instance_response.success
+        except rospy.ServiceException as e:
+            print("reset_planning_instance service call failed: %s" % e)
 
     def serviceCall_clear_planning_instance(self):
         rospy.wait_for_service("clear_planning_instance")
@@ -217,6 +228,24 @@ class MonotoneExperimenter(object):
 
         return execute_success
 
+    def resetInstance(self, armType):
+        reset_planning_success = self.serviceCall_reset_planning_instance()
+        reset_roadmap_success = self.serviceCall_reset_roadmap(armType)
+        if reset_planning_success and reset_roadmap_success:
+            return True
+        else:
+            return False
+
+    def clearInstance(self, armType):
+        clear_planning_success = self.serviceCall_clear_planning_instance()
+        clear_execution_success = self.serviceCall_clear_execution_instance()
+        reset_roadmap_success = self.serviceCall_reset_roadmap(armType)
+        if clear_planning_success and clear_execution_success and reset_roadmap_success:
+            return True
+        else:
+            return False
+
+
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
         ### and initializes a ros node
@@ -253,28 +282,30 @@ def main(args):
             TASK_SUCCESS, DFS_DP_labeled_object_ordering = \
                         rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects))
             DFS_DP_labeled_planning_time = time.time() - start_time
-            print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
 
-            ### (ii) DFS_DP
-            # start_time = time.time()
-            # TASK_SUCCESS, DFS_DP_object_ordering = \
-            #     rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
-            # DFS_DP_planning_time = time.time() - start_time
-            # print("Time for DFS_DP planning is: {}".format(DFS_DP_planning_time))
+            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
 
-            ### (iii) mRS_labeled
-            # start_time = time.time()
-            # TASK_SUCCESS, mRS_labeled_object_ordering = \
-            #             rearrangement_task_planner.mRS_task_planning(len(cylinder_objects))
-            # mRS_labeled_planning_time = time.time() - start_time
-            # print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
+            ## (ii) DFS_DP_nonlabeled
+            start_time = time.time()
+            TASK_SUCCESS, DFS_DP_nonlabeled_object_ordering = \
+                rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
+            DFS_DP_nonlabeled_planning_time = time.time() - start_time
+            
+            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
 
-            ### (iv) mRS
-            # start_time = time.time()
-            # TASK_SUCCESS, mRS_object_ordering = \
-            #     rearrangement_task_planner.mRS_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
-            # mRS_planning_time = time.time() - start_time
-            # print("Time for mRS planning is: {}".format(mRS_planning_time))
+            ## (iii) mRS_labeled
+            start_time = time.time()
+            TASK_SUCCESS, mRS_labeled_object_ordering = \
+                        rearrangement_task_planner.mRS_task_planning(len(cylinder_objects))
+            mRS_labeled_planning_time = time.time() - start_time
+            
+            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
+
+            ### (iv) mRS_nonlabeled
+            start_time = time.time()
+            TASK_SUCCESS, mRS_nonlabeled_object_ordering = \
+                rearrangement_task_planner.mRS_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
+            mRS_nonlabeled_planning_time = time.time() - start_time
             #######################################################################################################
 
             if TASK_SUCCESS:
@@ -283,12 +314,24 @@ def main(args):
                 monotone_experimenter.saveSolution(
                     num_objects, num_monotoneInstancesSaved, \
                     DFS_DP_labeled_planning_time, DFS_DP_labeled_object_ordering, "official")
-            
+                print("\n")
+                print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+                print("Object ordering for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_object_ordering))
+                print("\n")
+                print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
+                print("Object ordering for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_object_ordering))
+                print("\n")
+                print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
+                print("Object ordering for mRS_labeled planning is: {}".format(mRS_labeled_object_ordering))
+                print("\n")
+                print("Time for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_planning_time))
+                print("Object ordering for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_object_ordering))
+                print("\n")
+
             ## Before moving on to the next instance, clear the current instance
-            clear_planning_success = monotone_experimenter.serviceCall_clear_planning_instance()
-            clear_execution_success = monotone_experimenter.serviceCall_clear_execution_instance()
-            reset_roadmap_success = monotone_experimenter.serviceCall_reset_roadmap("Right_torso")
-            input("check the clearance!!!")
+            clear_instance_success = monotone_experimenter.clearInstance("Right_torso")
+            input("check the instance clearance!!!")
+
 
     while not rospy.is_shutdown():
         rate.sleep()

@@ -29,7 +29,6 @@ class WorkspaceTable(object):
         self.rosPackagePath = rosPackagePath
         self.mesh_path = mesh_path
         self.known_geometries = []
-        self.object_geometries = OrderedDict()
         self.createRobotStandingBase(robotBasePosition, standingBase_dim, isPhysicsTurnOn)
         self.createTableScene(robotBasePosition, table_dim, table_offset_x, isPhysicsTurnOn)
         self.table_offset_x = table_offset_x
@@ -183,6 +182,7 @@ class WorkspaceTable(object):
     def generateInstance_cylinders(self, num_objects):
         ### return: success (bool)
         self.num_objects = num_objects ### obtain the number of objects
+        self.object_geometries = OrderedDict()
         print("--------generate an instance---------")
         cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
                                                 radius=self.cylinder_radius, height=self.cylinder_height, 
@@ -234,6 +234,7 @@ class WorkspaceTable(object):
         print("--------reproduce an instance---------")
         self.num_objects = len(cylinder_objects)
         ### first assign goal positions
+        self.object_geometries = OrderedDict()
         self.assignGoalPositions()
         self.object_initial_infos = OrderedDict()
         self.goal_visualization_mesh = OrderedDict() ### obj_idx (key): mesh (value)
@@ -278,18 +279,18 @@ class WorkspaceTable(object):
             counter += 1
 
         ###### print test ######
-        for obj_idx, object_info in self.object_geometries.items():
-            print(obj_idx)
-            print("object_index: " + str(object_info.object_index))
-            print("cylinder_radius: " + str(object_info.cylinder_radius))
-            print("cylinder_height: " + str(object_info.cylinder_height))
-            print("geo: " + str(object_info.geo))
-            print("curr_pos: " + str(object_info.curr_pos))
-            print("curr_position_idx: " + str(object_info.curr_position_idx))
-            print("collision_position_idx: " + str(object_info.collision_position_idx))
-            print("goal_pos: " + str(object_info.goal_pos))
-            print("goal_position_idx: " + str(object_info.goal_position_idx))
-            print("\n")
+        # for obj_idx, object_info in self.object_geometries.items():
+        #     print(obj_idx)
+        #     print("object_index: " + str(object_info.object_index))
+        #     print("cylinder_radius: " + str(object_info.cylinder_radius))
+        #     print("cylinder_height: " + str(object_info.cylinder_height))
+        #     print("geo: " + str(object_info.geo))
+        #     print("curr_pos: " + str(object_info.curr_pos))
+        #     print("curr_position_idx: " + str(object_info.curr_position_idx))
+        #     print("collision_position_idx: " + str(object_info.collision_position_idx))
+        #     print("goal_pos: " + str(object_info.goal_pos))
+        #     print("goal_position_idx: " + str(object_info.goal_position_idx))
+        #     print("\n")
 
         return True
 
@@ -311,6 +312,7 @@ class WorkspaceTable(object):
 
     def loadInstance_cylinders(self, num_objects, instance_number):
         instanceFile = os.path.join(self.rosPackagePath, "examples", str(num_objects)) + "/" + str(instance_number) + ".txt"
+        self.object_geometries = OrderedDict()
         print("--------load an instance---------")
         self.cylinder_c = p.createCollisionShape(shapeType=p.GEOM_CYLINDER,
             radius=self.cylinder_radius, height=self.cylinder_height, physicsClientId=self.server)
@@ -465,26 +467,35 @@ class WorkspaceTable(object):
             self.object_geometries[obj_idx].geo, position, orientation, physicsClientId=self.server)
         self.object_geometries[obj_idx].setCurrPosition(position_idx, collision_position_idx, position)
 
+    def reset_planning_instance(self):
+        ### this function resets the planning instance
+        ### (1) resets all object meshes back to initial positions
+        for obj_idx, object_initial_info in self.object_initial_infos.items():
+            temp_object_initial_pos = object_initial_info.pos
+            temp_position_idx = object_initial_info.position_idx
+            temp_collision_position_idx = object_initial_info.collision_position_idx
+            ### first update the mesh
+            p.resetBasePositionAndOrientation(
+                self.object_geometries[obj_idx].geo, 
+                temp_object_initial_pos, [0, 0, 0, 1.0], physicsClientId=self.server)
+            ### then update the statistics in object_geometries
+            self.object_geometries[obj_idx].setCurrPosition(
+                temp_position_idx, temp_collision_position_idx, temp_object_initial_pos)
 
     def clear_planning_instance(self):
         ### this function clears the planning instance
-        ### (1) empties assigned goal position
-        self.all_goal_positions = OrderedDict()
-        ### (2) deletes all object meshes in the workspace
+        ### (1) deletes all object meshes in the workspace
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
-        self.object_geometries = OrderedDict()
-        ### (3) delete visualization meshes in the workspace
+        ### (2) delete visualization meshes in the workspace
         for obj_idx, object_mesh in self.goal_visualization_mesh.items():
             p.removeBody(object_mesh)
-        self.goal_visualization_mesh = OrderedDict()
 
     def clear_execution_instance(self):
         ### this function clears the execution instance
         ### (1) deletes all object meshes in the workspace
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
-        self.object_geometries = OrderedDict()
 
 
 ### general class of object in the workspace

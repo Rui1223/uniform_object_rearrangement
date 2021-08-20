@@ -62,8 +62,8 @@ add_message_files(
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  AstarPathFinding.srv
   AstarPathFindingLabeled.srv
+  AstarPathFindingNonLabeled.srv
   AttachObject.srv
   ClearExecutionInstance.srv
   ClearPlanningInstance.srv
@@ -76,6 +76,7 @@ add_service_files(
   GetCurrRobotConfig.srv
   RearrangeCylinderObject.srv
   ReproduceInstanceCylinder.srv
+  ResetPlanningInstance.srv
   ResetRoadmap.srv
   ResetRobotCurrConfig.srv
   UpdateCertainObjectPose.srv

@@ -87,7 +87,7 @@ public:
     // destructor
     ~AstarSolver_t();
 
-    void setPlanningQuery(Graph_t &g, int query_idx, 
+    void setPlanningQuery_nonLabeled(Graph_t &g, int query_idx, 
             int start_idx, int goal_idx, std::vector<float> start_config, std::vector<float> goal_config,
             std::vector<int> start_neighbors_idx, std::vector<int> goal_neighbors_idx,
             std::vector<float> start_neighbors_cost, std::vector<float> goal_neighbors_cost,
@@ -103,7 +103,7 @@ public:
         );
 
     void prepareToSearch(Graph_t &g);
-    void Astar_search(Graph_t &g);
+    void Astar_search_nonLabeled(Graph_t &g);
     void Astar_search_labeled(Graph_t &g);
     bool checkEdgeCarryOccupiedLabels(const std::vector<int> &edgeLabels);
 
