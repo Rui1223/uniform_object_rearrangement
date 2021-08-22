@@ -461,8 +461,17 @@ class WorkspaceTable(object):
         return nearest_candidate_idx
 
 
-    def updateObjectMesh(self, obj_idx, position, position_idx, collision_position_idx, orientation=[0, 0, 0, 1]):
+    def updateObjectMesh(self, obj_idx, position_idx, orientation=[0, 0, 0, 1]):
         ### input - target_pose: [x, y, z]
+        if position_idx >= self.num_candidates:
+            ### this is an object initial position
+            position = self.object_initial_infos[obj_idx].position_idx
+            collision_position_idx = self.object_initial_infos[obj_idx].collision_position_idx
+        else:
+            ### this is a candidate position
+            position = self.candidate_geometries[position_idx].pos
+            collision_position_idx = position_idx
+
         p.resetBasePositionAndOrientation(
             self.object_geometries[obj_idx].geo, position, orientation, physicsClientId=self.server)
         self.object_geometries[obj_idx].setCurrPosition(position_idx, collision_position_idx, position)

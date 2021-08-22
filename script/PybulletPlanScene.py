@@ -219,8 +219,7 @@ class PybulletPlanScene(object):
 
     def update_certain_object_pose_callback(self, req):
         ### update the geometry mesh of a certain object to the target pose
-        position = [req.target_pose.x, req.target_pose.y, req.target_pose.z]
-        self.workspace_p.updateObjectMesh(req.object_idx, position, req.object_position_idx, req.object_collision_position_idx)
+        self.workspace_p.updateObjectMesh(req.object_idx, req.object_position_idx)
         # print("successfully update certain object geometry to the target pose" + str(position))
         return UpdateCertainObjectPoseResponse(True)
 

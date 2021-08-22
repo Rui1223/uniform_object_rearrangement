@@ -20,44 +20,26 @@ from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCert
 from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigRequest
 from uniform_object_rearrangement.srv import UpdateManipulationStatus, UpdateManipulationStatusRequest
 
-class RearrangementTaskPlanner(object):
-    def __init__(self, initial_arrangement, final_arrangement, isLabeledRoadmapUsed=True):
-        
-        ### understand the arrangement task
-        self.initial_arrangement = initial_arrangement
-        self.final_arrangement = final_arrangement
+class MonotoneLocalSolver(object):
+    def __init__(self, startArrNode, target_arrangement, isLabeledRoadmapUsed=True):
+
+        ### understand the local arrangement task
+        self.start_arrangement = startArrNode.arrangement
+        self.target_arrangement = target_arrangement
         ### a list of obj_idx of objects to arranged
-        self.all_objects = [i for i in range(len(self.initial_arrangement)) \
-            if self.initial_arrangement[i] != self.final_arrangement[i]]
+        self.all_objects = [i for i in range(len(self.start_arrangement)) \
+            if self.start_arrangement[i] != self.target_arrangement[i]]
         self.num_objects = len(self.all_objects)
         self.isLabeledRoadmapUsed = isLabeledRoadmapUsed
 
         ### initialize the tree structure
-        self.treeL = OrderedDict() ### key: ("L0", etc.) value: ArrNode
-        self.trees = {}
-        self.trees["Left"] = self.treeL
-        self.arrLeftRegistr = []
-        self.idLeftRegistr = []
-        ### add the initial_arrangement as the root node for the left tree
-        robot_curr_config = self.serviceCall_getCurrRobotConfig()
-        self.left_idx = 0
-        self.treeL["L0"] = ArrNode(
-            self.initial_arrangement, robot_curr_config, "L0", 
-            None, None, None, None, 0, None)
-        self.arrLeftRegistr.append(self.initial_arrangement)
-        self.idLeftRegistr.append("L0")
-        self.leftLeaves = ["L0"] ### keep track of leaves in the left tree
+        self.tree = OrderedDict() ### key: (scalar 0,1,etc..) value: ArrNode
+        self.node_idx = 0 ### start from root node (idx: 0)
+        self.tree[0] = startArrNode
 
         ### set the time limit
         self.time_threshold = 600 ### 600s (10 minutes)
-        self.planning_startTime = time.time()
-
-        ### the solution to harvest
-        self.isSolved = False
-        self.best_solution_cost = np.inf
-        self.totalActions = 0 ### record the total number of actions
-        self.object_ordering = [] ### a list of obj_idx (ordered)
-        self.object_paths = [] ### a list of ObjectRearrangePath paths
+        self.local_planning_startTime = time.time()
 
 
     def serviceCall_rearrangeCylinderObject(self, obj_idx, armType, isLabeledRoadmapUsed=True):
