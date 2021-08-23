@@ -29,7 +29,6 @@ from uniform_object_rearrangement.msg import ObjectRearrangePath
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderResponse
 from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsResponse
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectResponse
-from uniform_object_rearrangement.srv import GetCertainObjectPose, GetCertainObjectPoseResponse
 from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotConfigResponse
 from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseResponse
 from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigResponse
@@ -137,10 +136,6 @@ class PybulletPlanScene(object):
             "generate_configs_for_start_positions", GenerateConfigsForStartPositions,
             self.generate_configs_for_start_positions_callback)
 
-        self.get_certain_object_pose_server = rospy.Service(
-            "get_certain_object_pose", GetCertainObjectPose,
-            self.get_certain_object_pose_callback)
-
         self.get_curr_robot_config_server = rospy.Service(
             "get_curr_robot_config", GetCurrRobotConfig,
             self.get_curr_robot_config_callback)
@@ -210,15 +205,6 @@ class PybulletPlanScene(object):
         #     print("total_labels: " + str(object_initial_configs.total_labels))
         #     print("\n")
         return GenerateConfigsForStartPositionsResponse(True)
-
-    def get_certain_object_pose_callback(self, req):
-        ### given the specified object index
-        temp_curr_pos = self.workspace_p.object_geometries[req.object_idx].curr_pos
-        curr_position = Point(temp_curr_pos[0], temp_curr_pos[1], temp_curr_pos[2])
-        curr_position_idx = self.workspace_p.object_geometries[req.object_idx].curr_position_idx
-        collision_position_idx = self.workspace_p.object_geometries[req.object_idx].collision_position_idx
-        # print("successfully get the object pose for object " + str(req.object_idx))
-        return GetCertainObjectPoseResponse(curr_position, curr_position_idx, collision_position_idx)
 
     def get_curr_robot_config_callback(self, req):
         ### get the current robot config

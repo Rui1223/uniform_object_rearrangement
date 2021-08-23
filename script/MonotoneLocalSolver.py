@@ -14,7 +14,6 @@ import rospkg
 from sensor_msgs.msg import JointState
 
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectRequest
-from uniform_object_rearrangement.srv import GetCertainObjectPose, GetCertainObjectPoseRequest
 from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotConfigRequest
 from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseRequest
 from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigRequest
@@ -103,22 +102,6 @@ class MonotoneLocalSolver(object):
             return rearrange_cylinder_object_response.success, rearrange_cylinder_object_response.path
         except rospy.ServiceException as e:
             print("rearrange_cylinder_object service call failed: %s" % e)
-
-    def serviceCall_getCertainObjectPose(self, obj_idx):
-        '''call the GetCertainObjectPose service to get the object pose from planning '''
-        rospy.wait_for_service("get_certain_object_pose")
-        request = GetCertainObjectPoseRequest()
-        request.object_idx = obj_idx
-        try:
-            getObjectPose_proxy = rospy.ServiceProxy("get_certain_object_pose", GetCertainObjectPose)
-            getObjectPose_response = getObjectPose_proxy(request.object_idx)
-            object_curr_pos = [getObjectPose_response.curr_position.x, \
-                getObjectPose_response.curr_position.y, getObjectPose_response.curr_position.z]
-            object_curr_position_idx = getObjectPose_response.curr_position_idx
-            object_collision_position_idx = getObjectPose_response.collision_position_idx
-            return object_curr_pos, object_curr_position_idx, object_collision_position_idx
-        except rospy.ServiceException as e:
-            print("get_certain_object_pose service call failed: %s" % e)
 
     def serviceCall_getCurrRobotConfig(self):
         '''call the GetCurrRobotConfig service to get the robot current config from planning

@@ -72,7 +72,6 @@ add_service_files(
   ExecuteTrajectory.srv
   GenerateConfigsForStartPositions.srv
   GenerateInstanceCylinder.srv
-  GetCertainObjectPose.srv
   GetCurrRobotConfig.srv
   RearrangeCylinderObject.srv
   ReproduceInstanceCylinder.srv
