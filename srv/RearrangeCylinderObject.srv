@@ -1,7 +1,9 @@
 # This srv file defines the service
 # for rearranging a specified cylinder object
+# to a specific target position (represented by the idx)
 
 int32 object_idx
+int32 target_position_idx
 string armType
 bool isLabeledRoadmapUsed
 ---

@@ -18,9 +18,10 @@ from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajector
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
 from UnidirMRSPlanner import UnidirMRSPlanner
+from UnidirDFSDPPlanner import UnidirDFSDPPlanner
 
 ############################### description #########################################
-### This class defines a MonotoneTest class which
+### This class defines a MonotoneTester class which
 ### solves an rearrangement problem/example with 
 ### the number of the object specified
 ### It
@@ -216,19 +217,27 @@ def main(args):
         ik_generate_success = monotone_tester.serviceCall_generateConfigsForStartPositions("Right_torso")
 
         ####### now use the specified method to solve the instance #######
-        # if monotone_tester.method_name == "DFS_DP_labeled":
-        #     start_time = time.time()
-        #     TASK_SUCCESS, object_ordering = \
-        #         rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects))
-        #     planning_time = time.time() - start_time
-        #     print("Time for DFS_DP_labeled planning is: {}".format(planning_time))
+        if monotone_tester.method_name == "DFS_DP_labeled":
+            start_time = time.time()
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement)
+            planning_time = time.time() - start_time
+            print("Time for DFS_DP_labeled planning is: {}".format(planning_time))
+            isSolved = unidir_dfsdp_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_dfsdp_planner.object_ordering
+                object_paths = unidir_dfsdp_planner.object_paths
+                print("object_ordering: {}".format(object_ordering))
 
-        # if monotone_tester.method_name == "DFS_DP_nonlabeled":
-        #     start_time = time.time()
-        #     TASK_SUCCESS, object_ordering = \
-        #         rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
-        #     planning_time = time.time() - start_time
-        #     print("Time for DFS_DP_nonlabeled planning is: {}".format(planning_time))
+        if monotone_tester.method_name == "DFS_DP_nonlabeled":
+            start_time = time.time()
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
+            planning_time = time.time() - start_time
+            print("Time for DFS_DP_nonlabeled planning is: {}".format(planning_time))
+            isSolved = unidir_dfsdp_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_dfsdp_planner.object_ordering
+                object_paths = unidir_dfsdp_planner.object_paths
+                print("object_ordering: {}".format(object_ordering))
 
         if monotone_tester.method_name == "mRS_labeled":
             start_time = time.time()

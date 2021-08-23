@@ -72,10 +72,27 @@ class RearrangementTaskPlanner(object):
         self.object_paths = [] ### a list of ObjectRearrangePath paths
 
 
-    def serviceCall_rearrangeCylinderObject(self, obj_idx, armType, isLabeledRoadmapUsed=True):
+    def harvestSolution(self):
+        '''This function is called when it indicates a solution has been found
+        The function harvest the solution (solution data)'''
+        nodeID = self.finalNodeID
+        ### back track to get the object_ordering and object_path
+        while (self.treeL[nodeID].parent_id != None):
+            self.object_ordering.append(self.treeL[nodeID].objectTransferred_idx)
+            self.object_paths.append(self.treeL[nodeID].transition_path)
+            nodeID = self.treeL[nodeID].parent_id
+        ### reverse the object_ordering and object_paths
+        self.object_ordering.reverse()
+        self.object_paths.reverse()
+        self.totalActions = len(self.object_ordering)
+        self.best_solution_cost = self.totalActions
+
+
+    def serviceCall_rearrangeCylinderObject(self, obj_idx, target_position_idx, armType, isLabeledRoadmapUsed=True):
         rospy.wait_for_service("rearrange_cylinder_object")
         request = RearrangeCylinderObjectRequest()
         request.object_idx = obj_idx
+        request.target_position_idx = target_position_idx
         request.armType = armType
         request.isLabeledRoadmapUsed = isLabeledRoadmapUsed
         try:

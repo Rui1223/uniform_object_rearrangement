@@ -22,6 +22,19 @@ from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajector
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
 from UnidirMRSPlanner import UnidirMRSPlanner
+from UnidirDFSDPPlanner import UnidirDFSDPPlanner
+
+############################### description ###########################################
+### This class defines a MonotoneExperimenter class which
+### conducts large-scale experiments with different methods
+### with the number of experiments specified for each case (#objects)
+### It
+### (1) asks the execution scene to generate an instance
+### (2) asks the pose estimator to get the object poses
+### (3) reproduces the instance in task planner and solve it with a specified planner
+### (4) asks the planning scene to plan the manipulation paths
+### (5) collect statistics (e.g., time/actions) from each method for comparison purpose
+#######################################################################################
 
 class MonotoneExperimenter(object):
 
@@ -279,21 +292,25 @@ def main(args):
             ik_generate_success = monotone_experimenter.serviceCall_generateConfigsForStartPositions("Right_torso")
 
             ########## now using different methods in the RearrangementTaskPlanner to solve the instance ##########
-            # ## (i) DFS_DP_labeled
-            # start_time = time.time()
-            # TASK_SUCCESS, DFS_DP_labeled_object_ordering = \
-            #             rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects))
-            # DFS_DP_labeled_planning_time = time.time() - start_time
+            ## (i) DFS_DP_labeled
+            start_time = time.time()
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement)
+            DFS_DP_labeled_planning_time = time.time() - start_time
+            isSolved = unidir_dfsdp_planner.isSolved
+            if isSolved:
+                DFS_DP_labeled_object_ordering = unidir_dfsdp_planner.object_ordering
 
-            # reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
+            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
 
-            # ## (ii) DFS_DP_nonlabeled
-            # start_time = time.time()
-            # TASK_SUCCESS, DFS_DP_nonlabeled_object_ordering = \
-            #     rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
-            # DFS_DP_nonlabeled_planning_time = time.time() - start_time
-            
-            # reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
+            ## (ii) DFS_DP_nonlabeled
+            start_time = time.time()
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
+            DFS_DP_nonlabeled_planning_time = time.time() - start_time
+            isSolved = unidir_dfsdp_planner.isSolved
+            if isSolved:
+                DFS_DP_nonlabeled_object_ordering = unidir_dfsdp_planner.object_ordering
+
+            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
 
             ## (iii) mRS_labeled
             start_time = time.time()
@@ -317,15 +334,15 @@ def main(args):
             if isSolved:
                 num_monotoneInstancesSaved += 1
                 monotone_experimenter.saveInstance(num_objects, num_monotoneInstancesSaved, cylinder_objects)
-                # monotone_experimenter.saveSolution(
-                #     num_objects, num_monotoneInstancesSaved, \
-                #     DFS_DP_labeled_planning_time, DFS_DP_labeled_object_ordering, "official")
-                # print("\n")
-                # print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
-                # print("Object ordering for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_object_ordering))
-                # print("\n")
-                # print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
-                # print("Object ordering for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_object_ordering))
+                monotone_experimenter.saveSolution(
+                    num_objects, num_monotoneInstancesSaved, \
+                    DFS_DP_labeled_planning_time, DFS_DP_labeled_object_ordering, "official")
+                print("\n")
+                print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+                print("Object ordering for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_object_ordering))
+                print("\n")
+                print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
+                print("Object ordering for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_object_ordering))
                 print("\n")
                 print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
                 print("Object ordering for mRS_labeled planning is: {}".format(mRS_labeled_object_ordering))
