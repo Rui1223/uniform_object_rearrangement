@@ -116,10 +116,6 @@ class PybulletPlanScene(object):
             os.path.join(self.rosPackagePath, object_mesh_path),
             isPhysicsTurnOn, self.planningClientID)
 
-    def deployAllGoalPositions(self, object_interval_x=None, object_interval_y=None):
-        ### ask workspace to deploy all goal positions
-        self.workspace_p.deployAllGoalPositions(object_interval_x, object_interval_y)
-
 
     def rosInit(self):
         ### This function specifies the role of a node instance for this class
@@ -166,7 +162,8 @@ class PybulletPlanScene(object):
     def reproduce_instance_cylinder_callback(self, req):
         ### given the estimated cylinder objects
         rospy.logwarn("REPRODUCE REARRANGEMENT INSTANCE")
-        initial_arrangement, final_arrangement, success = self.workspace_p.reproduceInstance_cylinders(req.cylinder_objects)
+        initial_arrangement, final_arrangement, success = \
+            self.workspace_p.reproduceInstance_cylinders(req.cylinder_objects)
         if success == True:
             print("successfully reproduce an instance")
         else:
@@ -181,7 +178,7 @@ class PybulletPlanScene(object):
             ### for each object
             self.planner_p.object_initial_configPoses[obj_idx] = PositionCandidateConfigs(obj_idx)
             ### first generate graspingPose candidates with different orientations
-            graspingPose_candidates = self.generate_pose_candidates(obj_initial_info.pos)
+            graspingPose_candidates = self.planner_p.generate_pose_candidates(obj_initial_info.pos, self.workspace_p.cylinder_height)
             for pose_id, graspingPose in enumerate(graspingPose_candidates):
                 approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
                     self.planner_p.generateConfigBasedOnPose_initialPositions(
@@ -269,18 +266,6 @@ class PybulletPlanScene(object):
             ee_pose = copy.deepcopy(self.robot_p.right_ee_pose)
         return ee_pose
 
-    def generate_pose_candidates(self, position):
-        ### position: [x,y,z]
-        pose_candidates = []
-        orientations = self.generateOrientations()
-
-        ### for each orientation
-        for orientation in orientations:
-            targetPose = [[position[0], position[1], position[2] + self.workspace_p.cylinder_height/2 - 0.03], orientation]
-            pose_candidates.append(targetPose)
-
-        return pose_candidates
-
 
     def generateArmTrajectory(self, traj, armType, motomanRJointNames):
         '''generate arm trajectory (a list of JointState)
@@ -327,8 +312,8 @@ class PybulletPlanScene(object):
 
         currConfig = self.getCurrentConfig(req.armType)
         ########################## generate picking pose candidates ###################################
-        pickingPose_candidates = self.generate_pose_candidates(
-                                        self.workspace_p.object_geometries[req.object_idx].curr_pos)
+        pickingPose_candidates = self.planner_p.generate_pose_candidates(
+            self.workspace_p.object_geometries[req.object_idx].curr_pos, self.workspace_p.cylinder_height)
         ###############################################################################################
 
         #################### select the right picking pose until it works #############################
@@ -419,8 +404,8 @@ class PybulletPlanScene(object):
 
         currConfig = self.getCurrentConfig(req.armType)
         ########################## generate placing pose candidates ###################################
-        placingPose_candidates = self.generate_pose_candidates(
-                                        self.workspace_p.object_geometries[req.object_idx].goal_pos)
+        placingPose_candidates = self.planner_p.generate_pose_candidates(
+            self.workspace_p.object_geometries[req.object_idx].goal_pos, self.workspace_p.cylinder_height)
         ###############################################################################################
 
         #################### select the right placing pose until it works #############################
@@ -693,22 +678,6 @@ class PybulletPlanScene(object):
         ########################################################################################################
 
 
-    def generateOrientations(self, 
-            default_orientation=np.array([[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]),
-            possible_angles=[0, -15, -45, -30, 15, 45, 30]):
-        ###### this function generates all orientation given default and angle options ######
-        ### defalut_orientation: np.array([[0.0, 0.0, 1.0], [0.0, -1.0, 0.0], [1.0, 0.0, 0.0]])
-        orientations = []
-        for angle in possible_angles:
-            angle *= math.pi / 180.0
-            rotation = np.array([[math.cos(angle), -math.sin(angle), 0], 
-                                 [math.sin(angle), math.cos(angle), 0], 
-                                 [0, 0, 1]])
-            orientation = np.dot(default_orientation, rotation)
-            temp_quat = utils.getQuaternionFromRotationMatrix(orientation)
-            orientations.append(temp_quat)
-        return orientations
-
     #########################################################################################
     def generatePosesForAllCandidates(self, armType):
         self.planner_p.position_candidates_configPoses = OrderedDict()
@@ -717,7 +686,7 @@ class PybulletPlanScene(object):
             print("++++++++++++++CANDIDATE_IDX: " + str(candidate_idx) + "++++++++++++++")
             self.planner_p.position_candidates_configPoses[candidate_idx] = PositionCandidateConfigs(candidate_idx)
             ### first generate graspingPose_candidates with different orientations
-            graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos)
+            graspingPose_candidates = self.planner_p.generate_pose_candidates(cylinder_candidate.pos, self.workspace_p.cylinder_height)
             for pose_id, graspingPose in enumerate(graspingPose_candidates):
                 approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
                     self.planner_p.generateConfigBasedOnPose_candidates(
@@ -756,7 +725,7 @@ class PybulletPlanScene(object):
             cylinder_candidate = self.workspace_p.candidate_geometries[candidate_idx]
             print("++++++++++++++CANDIDATE_IDX: " + str(candidate_idx) + "++++++++++++++")
             ### first generate graspingPose_candidates with different orientations
-            graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos)
+            graspingPose_candidates = self.planner_p.generate_pose_candidates(cylinder_candidate.pos, self.workspace_p.cylinder_height)
             for pose_id, graspingPose in enumerate(graspingPose_candidates):
                 approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
                     self.planner_p.generateConfigBasedOnPose_candidates(

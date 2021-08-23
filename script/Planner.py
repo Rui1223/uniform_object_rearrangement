@@ -1913,6 +1913,39 @@ class Planner(object):
                 set(objectCollided_approaching), set(objectCollided_grasping), set(objectCollided_approaching+objectCollided_grasping)
     ###################################################################################################################
 
+    ###################################################################################################################
+    def generateOrientations(self, 
+            default_orientation=np.array([[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]),
+            possible_angles=[0, -15, -45, -30, 15, 45, 30]):
+        ###### this function generates all orientation given default and angle options ######
+        ### defalut_orientation: np.array([[0.0, 0.0, 1.0], [0.0, -1.0, 0.0], [1.0, 0.0, 0.0]])
+        orientations = []
+        for angle in possible_angles:
+            angle *= math.pi / 180.0
+            rotation = np.array([[math.cos(angle), -math.sin(angle), 0], 
+                                 [math.sin(angle), math.cos(angle), 0], 
+                                 [0, 0, 1]])
+            orientation = np.dot(default_orientation, rotation)
+            temp_quat = utils.getQuaternionFromRotationMatrix(orientation)
+            orientations.append(temp_quat)
+        return orientations    
+    ###################################################################################################################
+
+    ###################################################################################################################
+    def generate_pose_candidates(self, object_position, cylinder_height):
+        '''This function generate pose candidates for the given object_position'''
+        ### object_position: [x,y,z]
+        pose_candidates = []
+        orientations = self.generateOrientations()
+        ### for each orientation
+        for orientation in orientations:
+            targetPose = [[object_position[0], object_position[1], \
+                           object_position[2] + cylinder_height/2 - 0.03], orientation]
+            pose_candidates.append(targetPose)
+
+        return pose_candidates
+    ###################################################################################################################
+
 
     def serializeCandidatesConfigPoses(self):
         f_candidate_geometries = open(self.roadmapFolder+"/CandidatesConfigPoses.obj", 'wb')
