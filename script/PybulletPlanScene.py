@@ -45,6 +45,16 @@ from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlannin
 ### (3) communicates with grasp_pose node to get the grasp pose for grasping objects
 ####################################################################################
 
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+
 class PybulletPlanScene(object):
 
     def __init__(self, args):
@@ -161,12 +171,12 @@ class PybulletPlanScene(object):
     def reproduce_instance_cylinder_callback(self, req):
         ### given the estimated cylinder objects
         rospy.logwarn("REPRODUCE REARRANGEMENT INSTANCE")
-        success = self.workspace_p.reproduceInstance_cylinders(req.cylinder_objects)
+        initial_arrangement, final_arrangement, success = self.workspace_p.reproduceInstance_cylinders(req.cylinder_objects)
         if success == True:
             print("successfully reproduce an instance")
         else:
             print("fail to reproduce an instance")
-        return ReproduceInstanceCylinderResponse(success)
+        return ReproduceInstanceCylinderResponse(initial_arrangement, final_arrangement, success)
 
     def generate_configs_for_start_positions_callback(self, req):
         rospy.logwarn("GENERATE CONFIGS FOR START POSITIONS OF ALL OBJECTS")
@@ -323,8 +333,7 @@ class PybulletPlanScene(object):
 
     def rearrange_cylinder_object_legend(self, req):
         ### given the specified cylinder object and the armType
-        rospy.logwarn("PLANNING TO REARRANGE THE OBJECT")
-        print("object: {}".format(req.object_idx))
+        rospy.logwarn("PLANNING TO REARRANGE THE OBJECT %s", str(req.object_idx))
         object_path = ObjectRearrangePath()
         transit_traj = []
         transfer_traj = []
@@ -509,12 +518,12 @@ class PybulletPlanScene(object):
 
     def rearrange_cylinder_object(self, req):
         ### given the specified cylinder object and the armType
-        rospy.logwarn("PLANNING TO REARRANGE THE OBJECT")
-        print("object: {}".format(req.object_idx))
+        rospy.logwarn("PLANNING TO REARRANGE THE OBJECT %s", str(req.object_idx))
         object_path = ObjectRearrangePath()
         transit_traj = []
         transfer_traj = []
         finish_traj = []
+        blockPrint()
         curr_object_initial_configPoses = self.planner_p.object_initial_configPoses[req.object_idx]
         currConfig = self.getCurrentConfig(req.armType)
 
@@ -687,6 +696,7 @@ class PybulletPlanScene(object):
         object_path.finish_trajectory = self.generateArmTrajectory(
                                             finish_traj, req.armType, self.robot_p.motomanRJointNames)
         object_path.object_idx = req.object_idx
+        enablePrint()
         return True, object_path
         ########################################################################################################
 

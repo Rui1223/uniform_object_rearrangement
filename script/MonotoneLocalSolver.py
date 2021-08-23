@@ -20,6 +20,16 @@ from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCert
 from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigRequest
 from uniform_object_rearrangement.srv import UpdateManipulationStatus, UpdateManipulationStatusRequest
 
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+
 class MonotoneLocalSolver(object):
     def __init__(self, startArrNode, target_arrangement, isLabeledRoadmapUsed=True):
 
@@ -132,7 +142,7 @@ class MonotoneLocalSolver(object):
 class ArrNode(object):
     def __init__(self, arrangement, robotConfig, node_id, 
         transit_from_info, obj_transfer_position_indices, objectTransferred_idx, 
-        transition_path, cost_to_come, parent_id):
+        transition_path, cost_to_come, parent_id, object_ordering):
         self.arrangement = arrangement
         self.robotConfig = robotConfig
         self.node_id = node_id
@@ -149,6 +159,10 @@ class ArrNode(object):
         self.transition_path = transition_path
         self.cost_to_come = cost_to_come
         self.parent_id = parent_id
+        self.object_ordering = object_ordering
+    
+    def updateNodeID(self, node_id):
+        self.node_id = node_id
     
     def updateTransitFromInfo(self, transit_from_info):
         self.transit_from_info = transit_from_info
@@ -167,6 +181,9 @@ class ArrNode(object):
 
     def updateParent(self, parent_id):
         self.parent_id = parent_id
+    
+    def updateObjectOrdering(self, object_ordering):
+        self.object_ordering = object_ordering
 
     def getParentArr(self):
         parent_arr = copy.deepcopy(self.arrangement)

@@ -17,7 +17,7 @@ from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, G
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
-from RearrangementTaskPlanner import RearrangementTaskPlanner
+from UnidirMRSPlanner import UnidirMRSPlanner
 
 ############################### description #########################################
 ### This class defines a MonotoneTest class which
@@ -105,7 +105,9 @@ class MonotoneTester(object):
             reproduceInstanceCylinder_proxy = rospy.ServiceProxy(
                 "reproduce_instance_cylinder", ReproduceInstanceCylinder)
             reproduce_instance_cylinder_response = reproduceInstanceCylinder_proxy(request.cylinder_objects)
-            return reproduce_instance_cylinder_response.success
+            return list(reproduce_instance_cylinder_response.initial_arrangement), \
+                   list(reproduce_instance_cylinder_response.final_arrangement), \
+                   reproduce_instance_cylinder_response.success
         except rospy.ServiceException as e:
             print("reproduce_instance_cylinder service call failed: %s" % e)
     
@@ -198,7 +200,6 @@ class MonotoneTester(object):
 
 def main(args):
     monotone_tester = MonotoneTester(args)
-    rearrangement_task_planner = RearrangementTaskPlanner()
     monotone_tester.rosInit()
     rate = rospy.Rate(10) ### 10hz
 
@@ -209,40 +210,47 @@ def main(args):
         ### object pose estimation
         cylinder_objects = monotone_tester.serviceCall_cylinderPositionEstimate()
         ### reproduce the estimated object poses in the planning scene
-        reproduce_instance_success = monotone_tester.serviceCall_reproduceInstanceCylinder(cylinder_objects)
+        initial_arrangement, final_arrangement, reproduce_instance_success = \
+                monotone_tester.serviceCall_reproduceInstanceCylinder(cylinder_objects)
         ### generate IK config for start positions for all objects
-        ik_generate_start_time = time.time()
         ik_generate_success = monotone_tester.serviceCall_generateConfigsForStartPositions("Right_torso")
-        print("time for generating configs for all start positions: " + str(time.time() - ik_generate_start_time))
 
         ####### now use the specified method to solve the instance #######
-        if monotone_tester.method_name == "DFS_DP_labeled":
-            start_time = time.time()
-            TASK_SUCCESS, object_ordering = \
-                rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects))
-            planning_time = time.time() - start_time
-            print("Time for DFS_DP_labeled planning is: {}".format(planning_time))
+        # if monotone_tester.method_name == "DFS_DP_labeled":
+        #     start_time = time.time()
+        #     TASK_SUCCESS, object_ordering = \
+        #         rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects))
+        #     planning_time = time.time() - start_time
+        #     print("Time for DFS_DP_labeled planning is: {}".format(planning_time))
 
-        if monotone_tester.method_name == "DFS_DP_nonlabeled":
-            start_time = time.time()
-            TASK_SUCCESS, object_ordering = \
-                rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
-            planning_time = time.time() - start_time
-            print("Time for DFS_DP_nonlabeled planning is: {}".format(planning_time))
+        # if monotone_tester.method_name == "DFS_DP_nonlabeled":
+        #     start_time = time.time()
+        #     TASK_SUCCESS, object_ordering = \
+        #         rearrangement_task_planner.DFS_DP_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
+        #     planning_time = time.time() - start_time
+        #     print("Time for DFS_DP_nonlabeled planning is: {}".format(planning_time))
 
         if monotone_tester.method_name == "mRS_labeled":
             start_time = time.time()
-            TASK_SUCCESS, object_ordering = \
-                rearrangement_task_planner.mRS_task_planning(len(cylinder_objects))
+            unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement)
             planning_time = time.time() - start_time
             print("Time for mRS_labeled planning is: {}".format(planning_time))
+            isSolved = unidir_mrs_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_mrs_planner.object_ordering
+                object_paths = unidir_mrs_planner.object_paths
+                print("object_ordering: {}".format(object_ordering))
 
         if monotone_tester.method_name == "mRS_nonlabeled":
             start_time = time.time()
-            TASK_SUCCESS, object_ordering = \
-                rearrangement_task_planner.mRS_task_planning(len(cylinder_objects), isLabeledRoadmapUsed=False)
+            unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
             planning_time = time.time() - start_time
             print("Time for mRS_nonlabeled planning is: {}".format(planning_time))
+            isSolved = unidir_mrs_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_mrs_planner.object_ordering
+                object_paths = unidir_mrs_planner.object_paths
+                print("object_ordering: {}".format(object_ordering))
 
         saveInstanceAndSolution = True if input("save instance & solution?(y/n)") == 'y' else False
         print("save instance and solution: " + str(saveInstanceAndSolution))
@@ -252,10 +260,10 @@ def main(args):
             monotone_tester.saveSolution(
                 monotone_tester.num_objects, monotone_tester.instance_id, \
                 planning_time, object_ordering, monotone_tester.method_name)
-        input("enter to start the execution!!!!!")
-        start_time = time.time()
-        execute_success = monotone_tester.executeWholePlan(rearrangement_task_planner.object_paths)
-        print("Time for executing is: {}".format(time.time() - start_time))
+        if isSolved:
+            input("enter to start the execution!!!!!")
+            execute_success = monotone_tester.executeWholePlan(object_paths)
+
 
     while not rospy.is_shutdown():
         rate.sleep()

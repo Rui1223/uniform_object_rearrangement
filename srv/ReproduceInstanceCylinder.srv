@@ -4,4 +4,6 @@
 
 uniform_object_rearrangement/CylinderObj[] cylinder_objects
 ---
+int32[] initial_arrangement
+int32[] final_arrangement
 bool success

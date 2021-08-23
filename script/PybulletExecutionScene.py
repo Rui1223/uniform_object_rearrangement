@@ -35,6 +35,16 @@ from uniform_object_rearrangement.srv import AttachObject, AttachObjectResponse
 ### (2) execute the computed plan
 ###########################################################################
 
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+
 class PybulletExecutionScene(object):
 
     def __init__(self, args):
@@ -180,11 +190,11 @@ class PybulletExecutionScene(object):
         ### given the request data: attach (bool) + armType (string)
         if req.attach:
             self.executor_e.attachObject(req.object_idx, self.workspace_e, self.robot_e, req.armType)
-            print("successfully attached the object")
+            # print("successfully attached the object")
             return AttachObjectResponse(True)
         else:
             self.executor_e.detachObject(self.workspace_e, self.robot_e, req.armType)
-            print("successfully detached the object")
+            # print("successfully detached the object")
             return AttachObjectResponse(True)
 
 

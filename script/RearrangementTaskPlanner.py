@@ -20,6 +20,16 @@ from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCert
 from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigRequest
 from uniform_object_rearrangement.srv import UpdateManipulationStatus, UpdateManipulationStatusRequest
 
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+
 class RearrangementTaskPlanner(object):
     def __init__(self, initial_arrangement, final_arrangement, isLabeledRoadmapUsed=True):
         
@@ -38,14 +48,16 @@ class RearrangementTaskPlanner(object):
         self.trees["Left"] = self.treeL
         self.arrLeftRegistr = []
         self.idLeftRegistr = []
+        self.orderLeftRegistr = []
         ### add the initial_arrangement as the root node for the left tree
         robot_curr_config = self.serviceCall_getCurrRobotConfig()
         self.left_idx = 0
         self.treeL["L0"] = ArrNode(
             self.initial_arrangement, robot_curr_config, "L0", 
-            None, None, None, None, 0, None)
+            None, None, None, None, 0, None, [])
         self.arrLeftRegistr.append(self.initial_arrangement)
         self.idLeftRegistr.append("L0")
+        self.orderLeftRegistr.append([])
         self.leftLeaves = ["L0"] ### keep track of leaves in the left tree
 
         ### set the time limit
@@ -150,7 +162,7 @@ class RearrangementTaskPlanner(object):
 class ArrNode(object):
     def __init__(self, arrangement, robotConfig, node_id, 
         transit_from_info, obj_transfer_position_indices, objectTransferred_idx, 
-        transition_path, cost_to_come, parent_id):
+        transition_path, cost_to_come, parent_id, object_ordering):
         self.arrangement = arrangement
         self.robotConfig = robotConfig
         self.node_id = node_id
@@ -167,6 +179,10 @@ class ArrNode(object):
         self.transition_path = transition_path
         self.cost_to_come = cost_to_come
         self.parent_id = parent_id
+        self.object_ordering = object_ordering
+    
+    def updateNodeID(self, node_id):
+        self.node_id = node_id
     
     def updateTransitFromInfo(self, transit_from_info):
         self.transit_from_info = transit_from_info
@@ -185,6 +201,9 @@ class ArrNode(object):
 
     def updateParent(self, parent_id):
         self.parent_id = parent_id
+    
+    def updateObjectOrdering(self, object_ordering):
+        self.object_ordering = object_ordering
 
     def getParentArr(self):
         parent_arr = copy.deepcopy(self.arrangement)

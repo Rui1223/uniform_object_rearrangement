@@ -277,6 +277,13 @@ class WorkspaceTable(object):
             self.goal_visualization_mesh[obj_idx] = cylinder_objectM
             #############################################################################################################################
             counter += 1
+        
+        ### get the arrangement task
+        self.initial_arrangement = []
+        self.final_arrangement = []
+        for obj_idx, object_info in self.object_geometries.items():
+            self.initial_arrangement.append(object_info.curr_position_idx)
+            self.final_arrangement.append(object_info.goal_position_idx)
 
         ###### print test ######
         # for obj_idx, object_info in self.object_geometries.items():
@@ -292,7 +299,7 @@ class WorkspaceTable(object):
         #     print("goal_position_idx: " + str(object_info.goal_position_idx))
         #     print("\n")
 
-        return True
+        return self.initial_arrangement, self.final_arrangement, True
 
     
     def obtainCylinderObjectsInfo(self):
@@ -465,7 +472,7 @@ class WorkspaceTable(object):
         ### input - target_pose: [x, y, z]
         if position_idx >= self.num_candidates:
             ### this is an object initial position
-            position = self.object_initial_infos[obj_idx].position_idx
+            position = self.object_initial_infos[obj_idx].pos
             collision_position_idx = self.object_initial_infos[obj_idx].collision_position_idx
         else:
             ### this is a candidate position
@@ -475,6 +482,7 @@ class WorkspaceTable(object):
         p.resetBasePositionAndOrientation(
             self.object_geometries[obj_idx].geo, position, orientation, physicsClientId=self.server)
         self.object_geometries[obj_idx].setCurrPosition(position_idx, collision_position_idx, position)
+
 
     def reset_planning_instance(self):
         ### this function resets the planning instance
