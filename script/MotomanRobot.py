@@ -5,6 +5,7 @@ import pybullet as p
 import pybullet_data
 
 import time
+import copy
 import math
 from collections import OrderedDict
 import IPython
@@ -290,8 +291,28 @@ class MotomanRobot(object):
     def getRobotCurrConfig(self):
         ### this function return the current full configuration of the robot 
         ### joints [1(torso) + 7(leftArm) + 7(rightArm) + 6(rightHand)]
-        return [self.torsoCurrConfiguration] + self.leftArmCurrConfiguration + self.rightArmCurrConfiguration + self.rightHandCurrConfiguration
+        return [self.torsoCurrConfiguration] + self.leftArmCurrConfiguration + \
+                    self.rightArmCurrConfiguration + self.rightHandCurrConfiguration
+    
+    def getRobotCurrSingleArmConfig(self, armType):
+        ### this functions return the current single arm configuration of the robot
+        ### (i/ii) (torso)+left arm (iii/iv) (torso)+right arm
+        if armType == "Left":
+            currSingleArmConfig = copy.deepcopy(self.leftArmCurrConfiguration)
+        if armType == "Left_torso":
+            currSingleArmConfig = copy.deepcopy([self.torsoCurrConfiguration] + self.leftArmCurrConfiguration)
+        if armType == "Right":
+            currSingleArmConfig = copy.deepcopy(self.rightArmCurrConfiguration)
+        if armType == "Right_torso":
+            currSingleArmConfig = copy.deepcopy([self.torsoCurrConfiguration] + self.rightArmCurrConfiguration)
+        return currSingleArmConfig
 
+    def getCurrentEEPose(self, armType):
+        if armType == "Left" or armType == "Left_torso":
+            ee_pose = copy.deepcopy(self.left_ee_pose)
+        if armType == "Right" or armType == "Right_torso":
+            ee_pose = copy.deepcopy(self.right_ee_pose)
+        return ee_pose
 
     def getJointState(self):
         torso_joint_state = p.getJointStates(

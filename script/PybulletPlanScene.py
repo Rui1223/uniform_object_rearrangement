@@ -172,35 +172,7 @@ class PybulletPlanScene(object):
 
     def generate_configs_for_start_positions_callback(self, req):
         rospy.logwarn("GENERATE CONFIGS FOR START POSITIONS OF ALL OBJECTS")
-        self.planner_p.object_initial_configPoses = OrderedDict()
-        cylinder_positions_geometries = {candidate.position_idx : candidate.geo for candidate in self.workspace_p.candidate_geometries.values()}
-        for obj_idx, obj_initial_info in self.workspace_p.object_initial_infos.items():
-            ### for each object
-            self.planner_p.object_initial_configPoses[obj_idx] = PositionCandidateConfigs(obj_idx)
-            ### first generate graspingPose candidates with different orientations
-            graspingPose_candidates = self.planner_p.generate_pose_candidates(obj_initial_info.pos, self.workspace_p.cylinder_height)
-            for pose_id, graspingPose in enumerate(graspingPose_candidates):
-                approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
-                    self.planner_p.generateConfigBasedOnPose_initialPositions(
-                        graspingPose, self.robot_p, self.workspace_p, req.armType, cylinder_positions_geometries)
-                if approaching_config != []:
-                    self.planner_p.object_initial_configPoses[obj_idx].approaching_configs.append(approaching_config)
-                    self.planner_p.object_initial_configPoses[obj_idx].grasping_configs.append(grasping_config)
-                    self.planner_p.object_initial_configPoses[obj_idx].approaching_labels.append(approaching_label)
-                    self.planner_p.object_initial_configPoses[obj_idx].grasping_labels.append(grasping_label)
-                    self.planner_p.object_initial_configPoses[obj_idx].total_labels.append(total_label)
-        print("========= finish generate all object_initial_configPoses =========")
-        ### put the robot back to home configuration please
-        self.robot_p.resetRobotToHomeConfiguration()
-        ### uncomment below printing utility if you need debug ###
-        # for obj_idx, object_initial_configs in self.planner_p.object_initial_configPoses.items():
-        #     print(obj_idx)
-        #     print("approaching_configs: " + str(object_initial_configs.approaching_configs))
-        #     print("grasping_configs: " + str(object_initial_configs.grasping_configs))
-        #     print("approaching_labels: " + str(object_initial_configs.approaching_labels))
-        #     print("grasping_labels: " + str(object_initial_configs.grasping_labels))
-        #     print("total_labels: " + str(object_initial_configs.total_labels))
-        #     print("\n")
+        self.planner_p.generateAllConfigPoses_startPositions(self.robot_p, self.workspace_p, req.armType)
         return GenerateConfigsForStartPositionsResponse(True)
 
     def get_curr_robot_config_callback(self, req):
@@ -251,241 +223,9 @@ class PybulletPlanScene(object):
         self.robot_p.resetRobotToHomeConfiguration()
         return ClearPlanningInstanceResponse(True)
 
-
-    def getCurrentConfig(self, armType):
-        if armType == "Right":
-            currConfig = copy.deepcopy(self.robot_p.rightArmCurrConfiguration)
-        if armType == "Right_torso":
-            currConfig = copy.deepcopy([self.robot_p.torsoCurrConfiguration] + self.robot_p.rightArmCurrConfiguration)
-        return currConfig
-    
-    def getCurrentEEPose(self, armType):
-        if armType == "Left" or armType == "Left_torso":
-            ee_pose = copy.deepcopy(self.robot_p.left_ee_pose)
-        if armType == "Right" or armType == "Right_torso":
-            ee_pose = copy.deepcopy(self.robot_p.right_ee_pose)
-        return ee_pose
-
-
-    def generateArmTrajectory(self, traj, armType, motomanRJointNames):
-        '''generate arm trajectory (a list of JointState)
-        inputs
-        ======
-            traj (a list of list): a list of joint states [q1, q2, ..., qn]
-            armType (string): the arm type (e.g., "Left", "Right_torso)
-            motomanRJointNames (a list of strings): the names for controllable joints
-        outputs
-        =======
-            result_traj (ArmTrajectory()): the resulting trajectory (ArmTrajectory object)
-        '''
-        result_traj = ArmTrajectory()
-        result_traj.armType = armType
-        if armType == "Left" or armType == "Left_torso":
-            first_joint_index = 1
-        if armType == "Right" or armType == "Right_torso":
-            first_joint_index = 8
-        if armType == "Left_torso" or armType == "Right_torso":
-            jointNames = [motomanRJointNames[0]] + motomanRJointNames[first_joint_index:first_joint_index+7]
-        if armType == "Left" or armType == "Right":
-            jointNames = motomanRJointNames[first_joint_index:first_joint_index+7]
-
-        for config in traj:
-            joint_state = JointState()
-            joint_state.name = jointNames
-            joint_state.position = config
-            result_traj.trajectory.append(joint_state)
-        
-        return result_traj
-
     def rearrange_cylinder_object_callback(self, req):
-        # rearrange_success, object_manipulation_path = self.rearrange_cylinder_object_legend(req)
         rearrange_success, object_manipulation_path = self.rearrange_cylinder_object(req)
         return RearrangeCylinderObjectResponse(rearrange_success, object_manipulation_path)
-
-    def rearrange_cylinder_object_legend(self, req):
-        ### given the specified cylinder object and the armType
-        rospy.logwarn("PLANNING TO REARRANGE THE OBJECT %s", str(req.object_idx))
-        object_path = ObjectRearrangePath()
-        transit_traj = []
-        transfer_traj = []
-        finish_traj = []
-
-        currConfig = self.getCurrentConfig(req.armType)
-        ########################## generate picking pose candidates ###################################
-        pickingPose_candidates = self.planner_p.generate_pose_candidates(
-            self.workspace_p.object_geometries[req.object_idx].curr_pos, self.workspace_p.cylinder_height)
-        ###############################################################################################
-
-        #################### select the right picking pose until it works #############################
-        transit_success = False
-        for pose_id, pickingPose in enumerate(pickingPose_candidates):
-            ######################## check both picking and pre-picking pose ##########################
-            isPoseValid, FLAG, configToPickingPose = self.planner_p.generateConfigBasedOnPose(
-                                pickingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
-            if not isPoseValid:
-                print("This picking pose is not even valid. Move on to next candidate.")
-                continue
-            else:
-                ### check the connection with neighbors in the roadmap
-                print("The picking pose works. Check its neighboring connections.")
-                ### when to check the connection of the picking pose, you have to attach the object
-                temp_object_curr_pos = self.workspace_p.object_geometries[req.object_idx].curr_pos
-                self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
-                connectSuccess, pickingPose_neighbors_idx, pickingPose_neighbors_cost = self.planner_p.connectToNeighbors(
-                                            configToPickingPose, self.robot_p, self.workspace_p, req.armType)
-                ############## after check, disattach the object and put the object back ##############
-                self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
-                p.resetBasePositionAndOrientation(
-                    self.workspace_p.object_geometries[req.object_idx].geo, 
-                    temp_object_curr_pos, [0, 0, 0, 1.0], physicsClientId=self.planningClientID)
-                self.workspace_p.object_geometries[req.object_idx].curr_pos = temp_object_curr_pos
-                #######################################################################################
-
-                if not connectSuccess:
-                    print("This picking pose is not valid, due to no neighboring connections.")
-                    print("Move on to next candidate.")
-                    continue
-                else:                    
-                    print("The picking pose is valid, generate pre-picking")
-                    isPoseValid, FLAG, prePickingPose, configToPrePickingPose = \
-                        self.planner_p.generatePrePickingPose(
-                            pickingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
-                    if not isPoseValid:
-                        print("The pre-picking pose is not valid. Move on to next candidate.")
-                        continue
-                    else:
-                        ### check the connection with neighbors in the roadmap
-                        print("The pre-picking pose works. Check its neighboring connections.")
-                        connectSuccess, prePickingPose_neighbors_idx, prePickingPose_neighbors_cost = self.planner_p.connectToNeighbors(
-                                    configToPrePickingPose, self.robot_p, self.workspace_p, req.armType)
-                        if not connectSuccess:
-                            print("This pre-picking pose is not valid, due to no neighboring connections.")
-                            print("Move on to next candidate.")
-                            continue
-                        print("Both picking pose and pre-picking pose are legitimate. Proceed to planning for pre-picking.")
-            ###########################################################################################
-
-            ################### plan the path to pre-picking configuration ############################
-            connectSuccess, currConfig_neighbors_idx, currConfig_neighbors_cost = self.planner_p.connectToNeighbors(
-                        currConfig, self.robot_p, self.workspace_p, req.armType)
-            prePicking_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePickingPose, 
-                                currConfig_neighbors_idx, currConfig_neighbors_cost, 
-                                prePickingPose_neighbors_idx, prePickingPose_neighbors_cost, 
-                                self.robot_p, self.workspace_p, req.armType, req.isLabeledRoadmapUsed)
-            ### the planning has been finished, either success or failure
-            if prePicking_traj != []:
-                print("The transit (pre-picking) path for %s arm is successfully found" % req.armType)
-                transit_traj += prePicking_traj
-                ################# cartesian path from pre-picking to picking configuration #####################
-                currConfig = self.getCurrentConfig(req.armType)
-                ### you are reaching here since pre-picking has been reached, 
-                ### now get the path from pre-picking to picking
-                prePickToPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
-                    currConfig, configToPickingPose, self.robot_p, req.armType, self.workspace_p)
-                transit_traj += prePickToPickTraj
-                #################################################################################################
-                transit_success = True
-                break
-            else:
-                print("The transit (pre-picking) path for %s arm is not successfully found" % req.armType)
-                print("Move on to next candidate")
-                continue
-            ###########################################################################################
-        
-        if not transit_success:
-            print("No picking pose is qualified, either failed (1) picking pose (2) pre-picking pose (3) planning to pre-picking")
-            return False, object_path
-        
-        ### Otherwise, congrats! Transit is successful!
-        ######################################### attach the object ###########################################
-        ### Now we need to attach the object in hand before transferring the object
-        self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
-        #######################################################################################################
-
-        currConfig = self.getCurrentConfig(req.armType)
-        ########################## generate placing pose candidates ###################################
-        placingPose_candidates = self.planner_p.generate_pose_candidates(
-            self.workspace_p.object_geometries[req.object_idx].goal_pos, self.workspace_p.cylinder_height)
-        ###############################################################################################
-
-        #################### select the right placing pose until it works #############################
-        transfer_success = False
-        for pose_id, placingPose in enumerate(placingPose_candidates):
-            ####################### check the placing pose ###########################
-            isPoseValid, FLAG, configToPlacingPose = self.planner_p.generateConfigBasedOnPose(
-                    placingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
-            if not isPoseValid:
-                print("This placing pose is not valid. Move on to next candidate.")
-                continue
-            else:
-                ### check the connection with neighbors in the roadmap
-                print("The placing pose works. Check its neighboring connections.")
-                connectSuccess, placingPose_neighbors_idx, placingPose_neighbors_cost = self.planner_p.connectToNeighbors(
-                            configToPlacingPose, self.robot_p, self.workspace_p, req.armType)
-                if not connectSuccess:
-                    print("This placing pose is not valid, due to no neighboring connections.")
-                    print("Move on to next candidate.")
-                    continue
-                print("The placing pose is legitimate. Proceed to planning for placing.")
-        
-            ################### plan the path to placing configuration ###################
-            placing_traj = self.planner_p.AstarPathFinding(currConfig, configToPlacingPose, 
-                            pickingPose_neighbors_idx, pickingPose_neighbors_cost, 
-                            placingPose_neighbors_idx, placingPose_neighbors_cost,
-                            self.robot_p, self.workspace_p, req.armType, req.isLabeledRoadmapUsed)
-            ### the planning has been finished, either success or failure
-            if placing_traj != []:
-                print("The transfer placing path for %s arm is successfully found" % req.armType)
-                transfer_traj += placing_traj
-                transfer_success = True
-                ### after transferring the object, 
-                ### update the object's current position_idx and collision_position_idx
-                self.workspace_p.object_geometries[req.object_idx].setCurrPosition(
-                    self.workspace_p.object_geometries[req.object_idx].goal_position_idx,
-                    self.workspace_p.object_geometries[req.object_idx].goal_position_idx
-                )
-                break
-            else:
-                print("The transfer placing path for %s arm is not successfully found" % req.armType)
-                print("Move on to next candidate")
-                continue
-            ############################################################################################
-        
-        if not transfer_success:
-            print("No placing pose is qualified, either failed (1) placing pose (2) planning to placing")
-            return False, object_path
-
-        ### Otherwise, congrats! Transfer is successful!
-        ######################################### detach the object ###########################################
-        ### Now we need to detach the object in hand before retracting the object (post-placing)
-        self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
-        #######################################################################################################
-        ############# generate post-placing pose + cartesian move from placing to post-placing ################
-        ### The arm leaves the object from ABOVE
-        currConfig = self.getCurrentConfig(req.armType)
-        postPlacingPose = copy.deepcopy(placingPose)
-        postPlacingPose[0][2] += 0.05
-        isPoseValid, FLAG, configToPostPlacingPose = self.planner_p.generateConfigBasedOnPose(
-            postPlacingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
-        placeToPostPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
-                currConfig, configToPostPlacingPose, self.robot_p, req.armType, self.workspace_p)
-        finish_traj += placeToPostPlaceTraj
-        ########################################################################################################
-        
-        ################################# prepare the path for the object ######################################
-        ### get the current state
-        currConfig = self.getCurrentConfig(req.armType)
-        ### congrat! No problem of rearranging the current object
-        ### prepare the object path
-        object_path.transit_trajectory = self.generateArmTrajectory(
-                                            transit_traj, req.armType, self.robot_p.motomanRJointNames)
-        object_path.transfer_trajectory = self.generateArmTrajectory(
-                                            transfer_traj, req.armType, self.robot_p.motomanRJointNames)
-        object_path.finish_trajectory = self.generateArmTrajectory(
-                                            finish_traj, req.armType, self.robot_p.motomanRJointNames)
-        object_path.object_idx = req.object_idx
-        return True, object_path
-        ########################################################################################################
 
     def rearrange_cylinder_object(self, req):
         ### given the specified cylinder object and the armType
@@ -496,18 +236,19 @@ class PybulletPlanScene(object):
         finish_traj = []
         blockPrint()
 
-        # curr_obj_position_idx = self.workspace_p.object_geometries[req.object_idx]
-        # if curr_obj_position_idx >= self.workspace_p.num_candidates:
-        #     ### the object is at the initial position
-        #     curr_object_configPoses = self.planner_p.object_initial_configPoses[req.object_idx]
+        curr_obj_position_idx = self.workspace_p.object_geometries[req.object_idx].curr_position_idx
+        if curr_obj_position_idx >= self.workspace_p.num_candidates:
+            ### the object is at the initial position
+            curr_object_configPoses = self.planner_p.object_initial_configPoses[req.object_idx]
+        else:
+            ### the object is at certain position candidate
+            curr_object_configPoses = self.planner_p.position_candidates_configPoses[curr_obj_position_idx]
 
-        curr_object_initial_configPoses = self.planner_p.object_initial_configPoses[req.object_idx]
-
-        currConfig = self.getCurrentConfig(req.armType)
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
         ############################# select the right picking pose until it works #############################
         transit_success = False
-        for config_id in range(len(curr_object_initial_configPoses.grasping_configs)):
-            configToPickingPose = curr_object_initial_configPoses.grasping_configs[config_id]
+        for config_id in range(len(curr_object_configPoses.grasping_configs)):
+            configToPickingPose = curr_object_configPoses.grasping_configs[config_id]
             ############## check the collision of the selected configToPickingPose ##############
             self.planner_p.setRobotToConfig(configToPickingPose, self.robot_p, req.armType)
             isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
@@ -536,7 +277,7 @@ class PybulletPlanScene(object):
                     continue
                 else:
                     print("The picking pose is valid, generate pre-picking")
-                    configToPrePickingPose = curr_object_initial_configPoses.approaching_configs[config_id]
+                    configToPrePickingPose = curr_object_configPoses.approaching_configs[config_id]
                     ############## check the collision of the selected configToPrePickingPose ##############
                     self.planner_p.setRobotToConfig(configToPrePickingPose, self.robot_p, req.armType)
                     isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
@@ -567,7 +308,7 @@ class PybulletPlanScene(object):
                 print("The transit (pre-picking) path for %s arm is successfully found" % req.armType)
                 transit_traj += prePicking_traj
                 ################# cartesian path from pre-picking to picking configuration #####################
-                currConfig = self.getCurrentConfig(req.armType)
+                currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
                 ### you are reaching here since pre-picking has been reached, 
                 ### now get the path from pre-picking to picking
                 prePickToPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
@@ -591,14 +332,13 @@ class PybulletPlanScene(object):
         ### Now we need to attach the object in hand before transferring the object
         self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
         #######################################################################################################        
-        
-        currConfig = self.getCurrentConfig(req.armType)
-        goal_position_idx = self.workspace_p.all_goal_positions[req.object_idx]
-        curr_object_goal_configPoses = self.planner_p.position_candidates_configPoses[goal_position_idx]
+
+        target_object_configPoses = self.planner_p.position_candidates_configPoses[req.target_position_idx]
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
         ############################# select the right placing pose until it works #############################
         transfer_success = False
-        for config_id in range(len(curr_object_goal_configPoses.grasping_configs)):
-            configToPlacingPose = curr_object_goal_configPoses.grasping_configs[config_id]
+        for config_id in range(len(target_object_configPoses.grasping_configs)):
+            configToPlacingPose = target_object_configPoses.grasping_configs[config_id]
             ############## check the collision of the selected configToPlacingPose ##############
             self.planner_p.setRobotToConfig(configToPlacingPose, self.robot_p, req.armType)
             isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
@@ -629,9 +369,7 @@ class PybulletPlanScene(object):
                 ### after transferring the object, 
                 ### update the object's current position_idx and collision_position_idx
                 self.workspace_p.object_geometries[req.object_idx].setCurrPosition(
-                    self.workspace_p.object_geometries[req.object_idx].goal_position_idx,
-                    self.workspace_p.object_geometries[req.object_idx].goal_position_idx
-                )
+                    req.target_position_idx, req.target_position_idx)
                 break
             else:
                 print("The transfer placing path for %s arm is not successfully found" % req.armType)
@@ -650,8 +388,8 @@ class PybulletPlanScene(object):
         #######################################################################################################
         ############# generate post-placing pose + cartesian move from placing to post-placing ################
         ### The arm leaves the object from ABOVE
-        currConfig = self.getCurrentConfig(req.armType)
-        placingPose = self.getCurrentEEPose(req.armType)
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
+        placingPose = self.robot_p.getCurrentEEPose(req.armType)
         postPlacingPose = copy.deepcopy(placingPose)
         postPlacingPose[0][2] += 0.05
         isPoseValid, FLAG, configToPostPlacingPose = self.planner_p.generateConfigBasedOnPose(
@@ -663,7 +401,7 @@ class PybulletPlanScene(object):
 
         ################################# prepare the path for the object ######################################
         ### get the current state
-        currConfig = self.getCurrentConfig(req.armType)
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
         ### congrat! No problem of rearranging the current object
         ### prepare the object path
         object_path.transit_trajectory = self.generateArmTrajectory(
@@ -677,6 +415,35 @@ class PybulletPlanScene(object):
         return True, object_path
         ########################################################################################################
 
+    def generateArmTrajectory(self, traj, armType, motomanRJointNames):
+        '''generate arm trajectory (a list of JointState)
+        inputs
+        ======
+            traj (a list of list): a list of joint states [q1, q2, ..., qn]
+            armType (string): the arm type (e.g., "Left", "Right_torso)
+            motomanRJointNames (a list of strings): the names for controllable joints
+        outputs
+        =======
+            result_traj (ArmTrajectory()): the resulting trajectory (ArmTrajectory object)
+        '''
+        result_traj = ArmTrajectory()
+        result_traj.armType = armType
+        if armType == "Left" or armType == "Left_torso":
+            first_joint_index = 1
+        if armType == "Right" or armType == "Right_torso":
+            first_joint_index = 8
+        if armType == "Left_torso" or armType == "Right_torso":
+            jointNames = [motomanRJointNames[0]] + motomanRJointNames[first_joint_index:first_joint_index+7]
+        if armType == "Left" or armType == "Right":
+            jointNames = motomanRJointNames[first_joint_index:first_joint_index+7]
+
+        for config in traj:
+            joint_state = JointState()
+            joint_state.name = jointNames
+            joint_state.position = config
+            result_traj.trajectory.append(joint_state)
+        
+        return result_traj
 
     #########################################################################################
     def generatePosesForAllCandidates(self, armType):
@@ -802,6 +569,190 @@ class PybulletPlanScene(object):
         time.sleep(10000)
         #########################################################################################
 
+    def rearrange_cylinder_object_legend(self, req):
+        ### given the specified cylinder object and the armType
+        rospy.logwarn("PLANNING TO REARRANGE THE OBJECT %s", str(req.object_idx))
+        object_path = ObjectRearrangePath()
+        transit_traj = []
+        transfer_traj = []
+        finish_traj = []
+        blockPrint()
+
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
+        ########################## generate picking pose candidates ###################################
+        pickingPose_candidates = self.planner_p.generate_pose_candidates(
+            self.workspace_p.object_geometries[req.object_idx].curr_pos, self.workspace_p.cylinder_height)
+        ###############################################################################################
+
+        #################### select the right picking pose until it works #############################
+        transit_success = False
+        for pose_id, pickingPose in enumerate(pickingPose_candidates):
+            ######################## check both picking and pre-picking pose ##########################
+            isPoseValid, FLAG, configToPickingPose = self.planner_p.generateConfigBasedOnPose(
+                                pickingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
+            if not isPoseValid:
+                print("This picking pose is not even valid. Move on to next candidate.")
+                continue
+            else:
+                ### check the connection with neighbors in the roadmap
+                print("The picking pose works. Check its neighboring connections.")
+                ### when to check the connection of the picking pose, you have to attach the object
+                temp_object_curr_pos = self.workspace_p.object_geometries[req.object_idx].curr_pos
+                self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
+                connectSuccess, pickingPose_neighbors_idx, pickingPose_neighbors_cost = self.planner_p.connectToNeighbors(
+                                            configToPickingPose, self.robot_p, self.workspace_p, req.armType)
+                ############## after check, disattach the object and put the object back ##############
+                self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
+                p.resetBasePositionAndOrientation(
+                    self.workspace_p.object_geometries[req.object_idx].geo, 
+                    temp_object_curr_pos, [0, 0, 0, 1.0], physicsClientId=self.planningClientID)
+                self.workspace_p.object_geometries[req.object_idx].curr_pos = temp_object_curr_pos
+                #######################################################################################
+
+                if not connectSuccess:
+                    print("This picking pose is not valid, due to no neighboring connections.")
+                    print("Move on to next candidate.")
+                    continue
+                else:                    
+                    print("The picking pose is valid, generate pre-picking")
+                    isPoseValid, FLAG, prePickingPose, configToPrePickingPose = \
+                        self.planner_p.generatePrePickingPose(
+                            pickingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
+                    if not isPoseValid:
+                        print("The pre-picking pose is not valid. Move on to next candidate.")
+                        continue
+                    else:
+                        ### check the connection with neighbors in the roadmap
+                        print("The pre-picking pose works. Check its neighboring connections.")
+                        connectSuccess, prePickingPose_neighbors_idx, prePickingPose_neighbors_cost = self.planner_p.connectToNeighbors(
+                                    configToPrePickingPose, self.robot_p, self.workspace_p, req.armType)
+                        if not connectSuccess:
+                            print("This pre-picking pose is not valid, due to no neighboring connections.")
+                            print("Move on to next candidate.")
+                            continue
+                        print("Both picking pose and pre-picking pose are legitimate. Proceed to planning for pre-picking.")
+            ###########################################################################################
+
+            ################### plan the path to pre-picking configuration ############################
+            connectSuccess, currConfig_neighbors_idx, currConfig_neighbors_cost = self.planner_p.connectToNeighbors(
+                        currConfig, self.robot_p, self.workspace_p, req.armType)
+            prePicking_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePickingPose, 
+                                currConfig_neighbors_idx, currConfig_neighbors_cost, 
+                                prePickingPose_neighbors_idx, prePickingPose_neighbors_cost, 
+                                self.robot_p, self.workspace_p, req.armType, req.isLabeledRoadmapUsed)
+            ### the planning has been finished, either success or failure
+            if prePicking_traj != []:
+                print("The transit (pre-picking) path for %s arm is successfully found" % req.armType)
+                transit_traj += prePicking_traj
+                ################# cartesian path from pre-picking to picking configuration #####################
+                currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
+                ### you are reaching here since pre-picking has been reached, 
+                ### now get the path from pre-picking to picking
+                prePickToPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
+                    currConfig, configToPickingPose, self.robot_p, req.armType, self.workspace_p)
+                transit_traj += prePickToPickTraj
+                #################################################################################################
+                transit_success = True
+                break
+            else:
+                print("The transit (pre-picking) path for %s arm is not successfully found" % req.armType)
+                print("Move on to next candidate")
+                continue
+            ###########################################################################################
+        
+        if not transit_success:
+            print("No picking pose is qualified, either failed (1) picking pose (2) pre-picking pose (3) planning to pre-picking")
+            return False, object_path
+        
+        ### Otherwise, congrats! Transit is successful!
+        ######################################### attach the object ###########################################
+        ### Now we need to attach the object in hand before transferring the object
+        self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
+        #######################################################################################################
+
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
+        ########################## generate placing pose candidates ###################################
+        placingPose_candidates = self.planner_p.generate_pose_candidates(
+            self.workspace_p.candidate_geometries[req.target_position_idx].pos, self.workspace_p.cylinder_height)
+        ###############################################################################################
+
+        #################### select the right placing pose until it works #############################
+        transfer_success = False
+        for pose_id, placingPose in enumerate(placingPose_candidates):
+            ####################### check the placing pose ###########################
+            isPoseValid, FLAG, configToPlacingPose = self.planner_p.generateConfigBasedOnPose(
+                    placingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
+            if not isPoseValid:
+                print("This placing pose is not valid. Move on to next candidate.")
+                continue
+            else:
+                ### check the connection with neighbors in the roadmap
+                print("The placing pose works. Check its neighboring connections.")
+                connectSuccess, placingPose_neighbors_idx, placingPose_neighbors_cost = self.planner_p.connectToNeighbors(
+                            configToPlacingPose, self.robot_p, self.workspace_p, req.armType)
+                if not connectSuccess:
+                    print("This placing pose is not valid, due to no neighboring connections.")
+                    print("Move on to next candidate.")
+                    continue
+                print("The placing pose is legitimate. Proceed to planning for placing.")
+        
+            ################### plan the path to placing configuration ###################
+            placing_traj = self.planner_p.AstarPathFinding(currConfig, configToPlacingPose, 
+                            pickingPose_neighbors_idx, pickingPose_neighbors_cost, 
+                            placingPose_neighbors_idx, placingPose_neighbors_cost,
+                            self.robot_p, self.workspace_p, req.armType, req.isLabeledRoadmapUsed)
+            ### the planning has been finished, either success or failure
+            if placing_traj != []:
+                print("The transfer placing path for %s arm is successfully found" % req.armType)
+                transfer_traj += placing_traj
+                transfer_success = True
+                ### after transferring the object, 
+                ### update the object's current position_idx and collision_position_idx
+                self.workspace_p.object_geometries[req.object_idx].setCurrPosition(
+                    req.target_position_idx, req.target_position_idx)
+                break
+            else:
+                print("The transfer placing path for %s arm is not successfully found" % req.armType)
+                print("Move on to next candidate")
+                continue
+            ############################################################################################
+        
+        if not transfer_success:
+            print("No placing pose is qualified, either failed (1) placing pose (2) planning to placing")
+            return False, object_path
+
+        ### Otherwise, congrats! Transfer is successful!
+        ######################################### detach the object ###########################################
+        ### Now we need to detach the object in hand before retracting the object (post-placing)
+        self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
+        #######################################################################################################
+        ############# generate post-placing pose + cartesian move from placing to post-placing ################
+        ### The arm leaves the object from ABOVE
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
+        postPlacingPose = copy.deepcopy(placingPose)
+        postPlacingPose[0][2] += 0.05
+        isPoseValid, FLAG, configToPostPlacingPose = self.planner_p.generateConfigBasedOnPose(
+            postPlacingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
+        placeToPostPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
+                currConfig, configToPostPlacingPose, self.robot_p, req.armType, self.workspace_p)
+        finish_traj += placeToPostPlaceTraj
+        ########################################################################################################
+        
+        ################################# prepare the path for the object ######################################
+        ### get the current state
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
+        ### congrat! No problem of rearranging the current object
+        ### prepare the object path
+        object_path.transit_trajectory = self.generateArmTrajectory(
+                                            transit_traj, req.armType, self.robot_p.motomanRJointNames)
+        object_path.transfer_trajectory = self.generateArmTrajectory(
+                                            transfer_traj, req.armType, self.robot_p.motomanRJointNames)
+        object_path.finish_trajectory = self.generateArmTrajectory(
+                                            finish_traj, req.armType, self.robot_p.motomanRJointNames)
+        object_path.object_idx = req.object_idx
+        enablePrint()
+        return True, object_path
+        ########################################################################################################
 
     def readROSParam(self):
         ### This functions read in needed ROS parameters
@@ -907,193 +858,3 @@ def main(args):
 
 if __name__ == '__main__':
     main(sys.argv)
-
-
-
-
-
-#######################################################################
-
-    # def rearrange_cylinder_object_backup(self, req):
-    #     ### given the specified cylinder object and the armType
-    #     rospy.logwarn("PLANNING TO REARRANGE THE OBJECT %s", str(req.object_idx))
-    #     object_path = ObjectRearrangePath()
-    #     transit_traj = []
-    #     transfer_traj = []
-    #     finish_traj = []
-    #     blockPrint()
-    #     curr_object_initial_configPoses = self.planner_p.object_initial_configPoses[req.object_idx]
-    #     currConfig = self.getCurrentConfig(req.armType)
-
-    #     ############################# select the right picking pose until it works #############################
-    #     transit_success = False
-    #     for config_id in range(len(curr_object_initial_configPoses.grasping_configs)):
-    #         configToPickingPose = curr_object_initial_configPoses.grasping_configs[config_id]
-    #         ############## check the collision of the selected configToPickingPose ##############
-    #         self.planner_p.setRobotToConfig(configToPickingPose, self.robot_p, req.armType)
-    #         isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
-    #         if not isConfigValid:
-    #             print("This picking pose is not even valid. Move on to next candidate.")
-    #             continue
-    #         else:
-    #             ### check the connection with neighbors in the roadmap
-    #             print("The picking pose works. Check its neighboring connections.")
-    #             ### when to check the connection of the picking pose, you have to attach the object
-    #             temp_object_curr_pos = self.workspace_p.object_geometries[req.object_idx].curr_pos
-    #             self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
-    #             connectSuccess, pickingPose_neighbors_idx, pickingPose_neighbors_cost = self.planner_p.connectToNeighbors(
-    #                                         configToPickingPose, self.robot_p, self.workspace_p, req.armType)
-    #             ############## after check, disattach the object and put the object back ##############
-    #             self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
-    #             p.resetBasePositionAndOrientation(
-    #                 self.workspace_p.object_geometries[req.object_idx].geo, 
-    #                 temp_object_curr_pos, [0, 0, 0, 1.0], physicsClientId=self.planningClientID)
-    #             self.workspace_p.object_geometries[req.object_idx].curr_pos = temp_object_curr_pos
-    #             #######################################################################################
-
-    #             if not connectSuccess:
-    #                 print("This picking pose is not valid, due to no neighboring connections.")
-    #                 print("Move on to next candidate.")
-    #                 continue
-    #             else:
-    #                 print("The picking pose is valid, generate pre-picking")
-    #                 configToPrePickingPose = curr_object_initial_configPoses.approaching_configs[config_id]
-    #                 ############## check the collision of the selected configToPrePickingPose ##############
-    #                 self.planner_p.setRobotToConfig(configToPrePickingPose, self.robot_p, req.armType)
-    #                 isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
-    #                 if not isConfigValid:
-    #                     print("The pre-picking pose is not valid. Move on to next candidate.")
-    #                     continue
-    #                 else:
-    #                     ### check the connection with neighbors in the roadmap
-    #                     print("The pre-picking pose works. Check its neighboring connections.")
-    #                     connectSuccess, prePickingPose_neighbors_idx, prePickingPose_neighbors_cost = self.planner_p.connectToNeighbors(
-    #                                 configToPrePickingPose, self.robot_p, self.workspace_p, req.armType)
-    #                     if not connectSuccess:
-    #                         print("This pre-picking pose is not valid, due to no neighboring connections.")
-    #                         print("Move on to next candidate.")
-    #                         continue
-    #                     print("Both picking pose and pre-picking pose are legitimate. Proceed to planning for pre-picking.")
-    #         ###########################################################################################
-
-    #         ################### plan the path to pre-picking configuration ############################
-    #         connectSuccess, currConfig_neighbors_idx, currConfig_neighbors_cost = self.planner_p.connectToNeighbors(
-    #                     currConfig, self.robot_p, self.workspace_p, req.armType)
-    #         prePicking_traj = self.planner_p.AstarPathFinding(currConfig, configToPrePickingPose, 
-    #                             currConfig_neighbors_idx, currConfig_neighbors_cost, 
-    #                             prePickingPose_neighbors_idx, prePickingPose_neighbors_cost, 
-    #                             self.robot_p, self.workspace_p, req.armType, req.isLabeledRoadmapUsed)   
-    #         ### the planning has been finished, either success or failure
-    #         if prePicking_traj != []:
-    #             print("The transit (pre-picking) path for %s arm is successfully found" % req.armType)
-    #             transit_traj += prePicking_traj
-    #             ################# cartesian path from pre-picking to picking configuration #####################
-    #             currConfig = self.getCurrentConfig(req.armType)
-    #             ### you are reaching here since pre-picking has been reached, 
-    #             ### now get the path from pre-picking to picking
-    #             prePickToPickTraj = self.planner_p.generateTrajectory_DirectConfigPath(
-    #                 currConfig, configToPickingPose, self.robot_p, req.armType, self.workspace_p)
-    #             transit_traj += prePickToPickTraj
-    #             #################################################################################################
-    #             transit_success = True
-    #             break
-    #         else:
-    #             print("The transit (pre-picking) path for %s arm is not successfully found" % req.armType)
-    #             print("Move on to next candidate")
-    #             continue
-    #         ###########################################################################################
-
-    #     if not transit_success:
-    #         print("No picking pose is qualified, either failed (1) picking pose (2) pre-picking pose (3) planning to pre-picking")
-    #         return False, object_path
-        
-    #     ### Otherwise, congrats! Transit is successful!
-    #     ######################################### attach the object ###########################################
-    #     ### Now we need to attach the object in hand before transferring the object
-    #     self.planner_p.attachObject(req.object_idx, self.workspace_p, self.robot_p, req.armType)
-    #     #######################################################################################################        
-        
-    #     currConfig = self.getCurrentConfig(req.armType)
-    #     goal_position_idx = self.workspace_p.all_goal_positions[req.object_idx]
-    #     curr_object_goal_configPoses = self.planner_p.position_candidates_configPoses[goal_position_idx]
-    #     ############################# select the right placing pose until it works #############################
-    #     transfer_success = False
-    #     for config_id in range(len(curr_object_goal_configPoses.grasping_configs)):
-    #         configToPlacingPose = curr_object_goal_configPoses.grasping_configs[config_id]
-    #         ############## check the collision of the selected configToPlacingPose ##############
-    #         self.planner_p.setRobotToConfig(configToPlacingPose, self.robot_p, req.armType)
-    #         isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
-    #         if not isConfigValid:
-    #             print("This placing pose is not valid. Move on to next candidate.")
-    #             continue
-    #         else:
-    #             ### check the connection with neighbors in the roadmap
-    #             print("The placing pose works. Check its neighboring connections.")
-    #             connectSuccess, placingPose_neighbors_idx, placingPose_neighbors_cost = self.planner_p.connectToNeighbors(
-    #                         configToPlacingPose, self.robot_p, self.workspace_p, req.armType)
-    #             if not connectSuccess:
-    #                 print("This placing pose is not valid, due to no neighboring connections.")
-    #                 print("Move on to next candidate.")
-    #                 continue
-    #             print("The placing pose is legitimate. Proceed to planning for placing.")
-            
-    #         ################### plan the path to placing configuration ###################
-    #         placing_traj = self.planner_p.AstarPathFinding(currConfig, configToPlacingPose, 
-    #                         pickingPose_neighbors_idx, pickingPose_neighbors_cost, 
-    #                         placingPose_neighbors_idx, placingPose_neighbors_cost,
-    #                         self.robot_p, self.workspace_p, req.armType, req.isLabeledRoadmapUsed)
-    #         ### the planning has been finished, either success or failure
-    #         if placing_traj != []:
-    #             print("The transfer placing path for %s arm is successfully found" % req.armType)
-    #             transfer_traj += placing_traj
-    #             transfer_success = True
-    #             ### after transferring the object, 
-    #             ### update the object's current position_idx and collision_position_idx
-    #             self.workspace_p.object_geometries[req.object_idx].setCurrPosition(
-    #                 self.workspace_p.object_geometries[req.object_idx].goal_position_idx,
-    #                 self.workspace_p.object_geometries[req.object_idx].goal_position_idx
-    #             )
-    #             break
-    #         else:
-    #             print("The transfer placing path for %s arm is not successfully found" % req.armType)
-    #             print("Move on to next candidate")
-    #             continue
-    #         ############################################################################################
-        
-    #     if not transfer_success:
-    #         print("No placing pose is qualified, either failed (1) placing pose (2) planning to placing")
-    #         return False, object_path
-        
-    #     ### Otherwise, congrats! Transfer is successful!
-    #     ######################################### detach the object ###########################################
-    #     ### Now we need to detach the object in hand before retracting the object (post-placing)
-    #     self.planner_p.detachObject(self.workspace_p, self.robot_p, req.armType)
-    #     #######################################################################################################
-    #     ############# generate post-placing pose + cartesian move from placing to post-placing ################
-    #     ### The arm leaves the object from ABOVE
-    #     currConfig = self.getCurrentConfig(req.armType)
-    #     placingPose = self.getCurrentEEPose(req.armType)
-    #     postPlacingPose = copy.deepcopy(placingPose)
-    #     postPlacingPose[0][2] += 0.05
-    #     isPoseValid, FLAG, configToPostPlacingPose = self.planner_p.generateConfigBasedOnPose(
-    #         postPlacingPose, currConfig, self.robot_p, self.workspace_p, req.armType)
-    #     placeToPostPlaceTraj = self.planner_p.generateTrajectory_DirectConfigPath(
-    #             currConfig, configToPostPlacingPose, self.robot_p, req.armType, self.workspace_p)
-    #     finish_traj += placeToPostPlaceTraj
-    #     ########################################################################################################
-
-    #     ################################# prepare the path for the object ######################################
-    #     ### get the current state
-    #     currConfig = self.getCurrentConfig(req.armType)
-    #     ### congrat! No problem of rearranging the current object
-    #     ### prepare the object path
-    #     object_path.transit_trajectory = self.generateArmTrajectory(
-    #                                         transit_traj, req.armType, self.robot_p.motomanRJointNames)
-    #     object_path.transfer_trajectory = self.generateArmTrajectory(
-    #                                         transfer_traj, req.armType, self.robot_p.motomanRJointNames)
-    #     object_path.finish_trajectory = self.generateArmTrajectory(
-    #                                         finish_traj, req.armType, self.robot_p.motomanRJointNames)
-    #     object_path.object_idx = req.object_idx
-    #     enablePrint()
-    #     return True, object_path
-    #     ########################################################################################################

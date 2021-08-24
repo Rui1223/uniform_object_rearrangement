@@ -16,6 +16,7 @@ import subprocess
 from operator import itemgetter
 import copy
 import pickle
+from collections import OrderedDict
 
 import utils
 from CollisionChecker import CollisionChecker
@@ -1944,6 +1945,40 @@ class Planner(object):
             pose_candidates.append(targetPose)
 
         return pose_candidates
+    ###################################################################################################################
+
+    ###################################################################################################################
+    def generateAllConfigPoses_startPositions(self, robot, workspace, armType):
+        self.object_initial_configPoses = OrderedDict()
+        cylinder_positions_geometries = {
+            candidate.position_idx : candidate.geo for candidate in workspace.candidate_geometries.values()}
+        for obj_idx, obj_initial_info in workspace.object_initial_infos.items():
+            ### for each object
+            self.object_initial_configPoses[obj_idx] = PositionCandidateConfigs(obj_idx)
+            ### first generate graspingPose candidates with different orientations
+            graspingPose_candidates = self.generate_pose_candidates(obj_initial_info.pos, workspace.cylinder_height)
+            for pose_id, graspingPose in enumerate(graspingPose_candidates):
+                approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
+                    self.generateConfigBasedOnPose_initialPositions(
+                        graspingPose, robot, workspace, armType, cylinder_positions_geometries)
+                if approaching_config != []:
+                    self.object_initial_configPoses[obj_idx].approaching_configs.append(approaching_config)
+                    self.object_initial_configPoses[obj_idx].grasping_configs.append(grasping_config)
+                    self.object_initial_configPoses[obj_idx].approaching_labels.append(approaching_label)
+                    self.object_initial_configPoses[obj_idx].grasping_labels.append(grasping_label)
+                    self.object_initial_configPoses[obj_idx].total_labels.append(total_label)
+        print("========= finish generate all object_initial_configPoses =========")
+        ### put the robot back to home configuration please
+        robot.resetRobotToHomeConfiguration()
+        ### uncomment below printing utility if you need debug ###
+        # for obj_idx, object_initial_configs in self.planner_p.object_initial_configPoses.items():
+        #     print(obj_idx)
+        #     print("approaching_configs: " + str(object_initial_configs.approaching_configs))
+        #     print("grasping_configs: " + str(object_initial_configs.grasping_configs))
+        #     print("approaching_labels: " + str(object_initial_configs.approaching_labels))
+        #     print("grasping_labels: " + str(object_initial_configs.grasping_labels))
+        #     print("total_labels: " + str(object_initial_configs.total_labels))
+        #     print("\n")        
     ###################################################################################################################
 
 
