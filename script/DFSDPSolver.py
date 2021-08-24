@@ -28,9 +28,8 @@ class DFSDPSolver(MonotoneLocalSolver):
     def __init__(self, startArrNode, target_arrangement, isLabeledRoadmapUsed=True):
         MonotoneLocalSolver.__init__(
             self, startArrNode, target_arrangement, isLabeledRoadmapUsed)
-        rospy.logwarn("a DFSDPSolver start to work")
-        ### a list of set() - current object set (e.g, (1,2,3) == (3,2,1))
-        self.explored = []
+        rospy.logwarn("a DFSDPSolver starts to work")
+        self.explored = [] ### a list of arrangements which have been explored
 
     def dfsdp_solve(self):
         LOCAL_TASK_SUCCESS = self.DFS_DP()
@@ -38,7 +37,7 @@ class DFSDPSolver(MonotoneLocalSolver):
 
     def DFS_DP(self):
         '''search towards final arrangement based on current arrangement'''
-        ###### return FLAG==true if the problem is solved by mRS (an indication of monotonicity) ######
+        ###### return FLAG==true if the problem is solved by DFS_DP (an indication of monotonicity) ######
         current_node_id = copy.deepcopy(self.node_idx)
         current_arrangement = self.tree[current_node_id].arrangement
         current_ordering = self.tree[current_node_id].object_ordering
