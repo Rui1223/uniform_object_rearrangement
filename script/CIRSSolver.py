@@ -14,6 +14,8 @@ import rospkg
 from MonotoneLocalSolver import MonotoneLocalSolver
 from MonotoneLocalSolver import ArrNode
 
+from uniform_object_rearrangement.srv import DetectInvalidArrStates, DetectInvalidArrStatesRequest
+
 
 # Disable
 def blockPrint():
@@ -38,15 +40,14 @@ class CIRSSolver(MonotoneLocalSolver):
     def cirs_solve(self):
         ### before the search, given start_arrangement and target_arrangement
         ### detect all invalid arrangement at which each object to be manipulated
-        self.detectInvalidStates()
+        self.detectInvalidArrStates()
         LOCAL_TASK_SUCCESS = self.CIDFS_DP()
         return LOCAL_TASK_SUCCESS, self.tree
 
-    def detectInvalidStates(self):
+    def detectInvalidArrStates(self):
         '''This function detects all invalid states of arrangement
         at which each object is manipulated in the local task'''
-        #### TO BE COMPLETED...
-        pass
+        invalid_states = self.serviceCall_detectInvalidArrStates()
 
     def CIDFS_DP(self):
         '''search towards final arrangement based on current arrangement'''
@@ -55,5 +56,19 @@ class CIRSSolver(MonotoneLocalSolver):
         ### THIS FUNCTION IS ALMOST THE SAME AS DFS_DP WITH ONE EXCEPTION
         ### ONLINE CHECKING IF THE ARRANGEMENT IS IN THE INVALID STATES OF ARRANGEMENT
         pass
+
+
+    def serviceCall_detectInvalidArrStates(self):
+        rospy.wait_for_service("detect_invalid_arr_states")
+        request = DetectInvalidArrStatesRequest()
+        request.start_arrangement = self.start_arrangement
+        request.target_arrangement = self.target_arrangement
+        try:
+            detectInvalidArrStates_proxy = rospy.ServiceProxy(
+                "detect_invalid_arr_states", DetectInvalidArrStates)
+            detect_invalid_arr_states_response = detectInvalidArrStates_proxy(request)
+            return detect_invalid_arr_states_response.success
+        except rospy.ServiceException as e:
+            print("detect_invalid_arr_states service call failed: %s" % e)
     
 

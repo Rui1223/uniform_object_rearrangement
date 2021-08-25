@@ -165,7 +165,6 @@ class Planner(object):
                 # input("I want to see these points")
         ##########################################################################
 
-
     def samplingNodes_configurationSpace(self, robot, workspace, armType):
         temp_counter = 0
         ### Let's start
@@ -359,6 +358,57 @@ class Planner(object):
         #         joint_value = robot.ul[i_joint] - 0.017
         #     rp.append(joint_value)
         # return rp
+
+    def obtainCurrObjectConfigPoses(self, workspace, object_idx):
+        ### This function feteches the current object's configPoses specified by object_idx
+        curr_obj_position_idx = workspace.object_geometries[object_idx].curr_position_idx
+        if curr_obj_position_idx >= workspace.num_candidates:
+            ### the object is at the initial position
+            curr_object_configPoses = self.object_initial_configPoses[object_idx]
+        else:
+            ### the object is at certain position candidate
+            curr_object_configPoses = self.position_candidates_configPoses[curr_obj_position_idx]
+        return curr_object_configPoses
+    
+    def getConstraintsFromLabels(self, configPoses, target_arrangement, manipulation_mode):
+        '''This function gets all objects target constraints from labels
+        stored in the configPoses'''
+        ### configPoses: a PositionCandidateConfigs object
+        ### target_arrangement: a list/tuple of object_indices
+        ### manipulation_mode: "picking" or "placing"
+        target_arrangement = list(target_arrangement)
+        configPoses_constraints = []
+        if manipulation_mode == "picking":
+            all_pose_labels = configPoses.total_labels
+        if manipulation_mode == "placing":
+            all_pose_labels = configPoses.grasping_labels
+        for pose_i in range(len(all_pose_labels)):
+            pose_labels = all_pose_labels[pose_i]
+            configPoses_constraints.append([])
+            for label in pose_labels:
+                if label in target_arrangement:
+                    ### get the object_idx of the object that occupied that label at target arrangement
+                    configPoses_constraints[pose_i].append(target_arrangement.index(label))
+        return configPoses_constraints
+
+    def addInvalidArrStates(self, configPoses_constraints, object_idx):
+        '''This functions add invalid arrangement states given
+        constraints and the object to be manipulated (object_idx)'''
+        ### configPoses_constraints: [[obj_indices], [obj_indices], [obj_indices]]
+        ### first get failure reasons
+        failure_reasons = []
+        if [] in configPoses_constraints: return
+        utils.generateCombination(configPoses_constraints, 0, [], failure_reasons)
+        ### once we get the failure reasons, construct and add invalid states
+        for failure_reason in failure_reasons:
+            for cstr_obj_idx in failure_reason:
+                invalid_state = {}
+                invalid_state[object_idx] = False
+                for obj_idx in failure_reason:
+                    if obj_idx == cstr_obj_idx: continue
+                    invalid_state[obj_idx] = True
+                self.invalid_arr_states_per_obj[cstr_obj_idx].append(invalid_state)
+
 
     def generatePrePickingPose(self, pose, rest_config, robot, workspace, armType):
         ### This function generates a pre-picking (post-placing) pose based on grasp pose
@@ -1714,6 +1764,7 @@ class Planner(object):
         except rospy.ServiceException as e:
             print("Service call failed: %s" % e)
 
+    ###################################################################################################################
     ###################################################################################################################
     def generateConfigBasedOnPose_candidates(self, pose, robot, workspace, armType, cylinder_positions_geometries):
         ### This function generates IK for a pose and check the IK

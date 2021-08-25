@@ -132,3 +132,17 @@ def getQuaternionFromRotationMatrix(rot):
 
     return quat
 
+
+def generateCombination(L, row, cur, res):
+    if (row >= len(L)):
+        # res.append(cur)
+        if cur not in res:
+            res.append(cur)
+        return
+    for col in range(len(L[row])):
+        if L[row][col] not in cur:
+            cur_new = cur+[L[row][col]]
+            generateCombination(L, row+1, cur_new, res)
+        else:
+            generateCombination(L, row+1, cur, res)
+

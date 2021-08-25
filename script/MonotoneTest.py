@@ -19,6 +19,7 @@ from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
 from UnidirMRSPlanner import UnidirMRSPlanner
 from UnidirDFSDPPlanner import UnidirDFSDPPlanner
+from UnidirCIRSPlanner import UnidirCIRSPlanner
 
 ############################### description #########################################
 ### This class defines a MonotoneTester class which
@@ -259,6 +260,17 @@ def main(args):
             if isSolved:
                 object_ordering = unidir_mrs_planner.object_ordering
                 object_paths = unidir_mrs_planner.object_paths
+                print("object_ordering: {}".format(object_ordering))
+        
+        if monotone_tester.method_name == "CIRS":
+            start_time = time.time()
+            unidir_cirs_planner = UnidirCIRSPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=True)
+            planning_time = time.time() - start_time
+            print("Time for CIRS planning is: {}".format(planning_time))
+            isSolved = unidir_cirs_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_cirs_planner.object_ordering
+                object_paths = unidir_cirs_planner.object_paths
                 print("object_ordering: {}".format(object_ordering))
 
         saveInstanceAndSolution = True if input("save instance & solution?(y/n)") == 'y' else False

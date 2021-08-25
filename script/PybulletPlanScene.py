@@ -28,6 +28,7 @@ from uniform_object_rearrangement.msg import ArmTrajectory
 from uniform_object_rearrangement.msg import ObjectRearrangePath
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderResponse
 from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsResponse
+from uniform_object_rearrangement.srv import DetectInvalidArrStates, DetectInvalidArrStatesResponse
 from uniform_object_rearrangement.srv import RearrangeCylinderObject, RearrangeCylinderObjectResponse
 from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotConfigResponse
 from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseResponse
@@ -132,6 +133,10 @@ class PybulletPlanScene(object):
             "generate_configs_for_start_positions", GenerateConfigsForStartPositions,
             self.generate_configs_for_start_positions_callback)
 
+        self.detect_invalid_arr_states_server = rospy.Service(
+            "detect_invalid_arr_states", DetectInvalidArrStates,
+            self.detect_invalid_arr_states_callback)
+
         self.get_curr_robot_config_server = rospy.Service(
             "get_curr_robot_config", GetCurrRobotConfig,
             self.get_curr_robot_config_callback)
@@ -174,6 +179,32 @@ class PybulletPlanScene(object):
         rospy.logwarn("GENERATE CONFIGS FOR START POSITIONS OF ALL OBJECTS")
         self.planner_p.generateAllConfigPoses_startPositions(self.robot_p, self.workspace_p, req.armType)
         return GenerateConfigsForStartPositionsResponse(True)
+
+    def detect_invalid_arr_states_callback(self, req):
+        rospy.logwarn("DETECT INVALID ARR STATES")
+        ### data initialization
+        self.planner_p.invalid_arr_states_per_obj = OrderedDict()
+        for obj_idx in range(len(req.start_arrangement)):
+            self.planner_p.invalid_arr_states_per_obj[obj_idx] = []
+        ### reason about each object to be manipulated
+        all_objects = [i for i in range(len(req.start_arrangement)) \
+            if req.start_arrangement[i] != req.target_arrangement[i]]
+        for obj_idx in all_objects:
+            ### get the object's all pre-picking + picking configPoses
+            curr_object_configPoses = \
+                self.planner_p.obtainCurrObjectConfigPoses(self.workspace_p, obj_idx)
+            ### get picking_configPoses_constraints (a list of list of objects) for this object
+            picking_configPoses_constraints = self.planner_p.getConstraintsFromLabels(
+                curr_object_configPoses, req.target_arrangement, "picking")
+            self.planner_p.addInvalidArrStates(picking_configPoses_constraints, obj_idx)
+            ### get the object's all placing configPoses
+            pass
+            ### get placing_configPoses_constraints for this object
+            pass
+            print("*************************************")
+            input("stop here to check if get constraints function is correct")
+
+        
 
     def get_curr_robot_config_callback(self, req):
         ### get the current robot config
@@ -236,13 +267,7 @@ class PybulletPlanScene(object):
         finish_traj = []
         blockPrint()
 
-        curr_obj_position_idx = self.workspace_p.object_geometries[req.object_idx].curr_position_idx
-        if curr_obj_position_idx >= self.workspace_p.num_candidates:
-            ### the object is at the initial position
-            curr_object_configPoses = self.planner_p.object_initial_configPoses[req.object_idx]
-        else:
-            ### the object is at certain position candidate
-            curr_object_configPoses = self.planner_p.position_candidates_configPoses[curr_obj_position_idx]
+        curr_object_configPoses = self.planner_p.obtainCurrObjectConfigPoses(self.workspace_p, req.object_idx)
 
         currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
         ############################# select the right picking pose until it works #############################
@@ -414,6 +439,7 @@ class PybulletPlanScene(object):
         enablePrint()
         return True, object_path
         ########################################################################################################
+
 
     def generateArmTrajectory(self, traj, armType, motomanRJointNames):
         '''generate arm trajectory (a list of JointState)
