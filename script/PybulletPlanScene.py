@@ -26,6 +26,8 @@ import utils
 
 from uniform_object_rearrangement.msg import ArmTrajectory
 from uniform_object_rearrangement.msg import ObjectRearrangePath
+from uniform_object_rearrangement.msg import ArrState
+from uniform_object_rearrangement.msg import ObjArrStates
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderResponse
 from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsResponse
 from uniform_object_rearrangement.srv import DetectInvalidArrStates, DetectInvalidArrStatesResponse
@@ -190,21 +192,52 @@ class PybulletPlanScene(object):
         all_objects = [i for i in range(len(req.start_arrangement)) \
             if req.start_arrangement[i] != req.target_arrangement[i]]
         for obj_idx in all_objects:
+            #################################################################################
             ### get the object's all pre-picking + picking configPoses
             curr_object_configPoses = \
                 self.planner_p.obtainCurrObjectConfigPoses(self.workspace_p, obj_idx)
             ### get picking_configPoses_constraints (a list of list of objects) for this object
             picking_configPoses_constraints = self.planner_p.getConstraintsFromLabels(
-                curr_object_configPoses, req.target_arrangement, "picking")
+                curr_object_configPoses, obj_idx, req.target_arrangement, "picking")
             self.planner_p.addInvalidArrStates(picking_configPoses_constraints, obj_idx)
+            ##################################################################################
+            ##################################################################################
             ### get the object's all placing configPoses
-            pass
-            ### get placing_configPoses_constraints for this object
-            pass
-            print("*************************************")
-            input("stop here to check if get constraints function is correct")
+            target_object_configPoses = \
+                self.planner_p.position_candidates_configPoses[req.target_arrangement[obj_idx]]
+            ### get placing_configPoses_constraints (a list of list of objects) for this object
+            placing_configPoses_constraints = self.planner_p.getConstraintsFromLabels(
+                target_object_configPoses, obj_idx, req.target_arrangement, "placing")
+            self.planner_p.addInvalidArrStates(placing_configPoses_constraints, obj_idx)
+            ##################################################################################
+        # print("invalid_arr_states_per_obj: ")
+        # print(self.planner_p.invalid_arr_states_per_obj)
+        ### prepare the response
+        detect_invalid_arr_states_response = DetectInvalidArrStatesResponse()
+        for obj_idx, obj_arr_states in self.planner_p.invalid_arr_states_per_obj.items():
+            obj_arr_states_msg = ObjArrStates()
+            #################################################
+            obj_arr_states_msg.obj_idx = obj_idx
+            for arr_state in obj_arr_states:
+                ### each arr_state is a dict, construct it as ArrState msg
+                arr_state_msg = ArrState()
+                for obj, isAtTarget in arr_state.items():
+                    arr_state_msg.obj_indices.append(obj)
+                    arr_state_msg.isAtTarget.append(isAtTarget)
+                obj_arr_states_msg.invalid_arr_states.append(arr_state_msg)
+            #################################################
+            detect_invalid_arr_states_response.all_obj_invalid_arr_states.append(obj_arr_states_msg)
+        # print("check ros messages")
+        # for obj_arr_states_msg in detect_invalid_arr_states_response.all_obj_invalid_arr_states:
+        #     print("obj_idx: " + str(obj_arr_states_msg.obj_idx))
+        #     for arr_state_msg in obj_arr_states_msg.invalid_arr_states:
+        #         print("obj_indices: ")
+        #         print(arr_state_msg.obj_indices)
+        #         print("isAtTarget: ")
+        #         print(arr_state_msg.isAtTarget)
+        #     print("========================")
+        return detect_invalid_arr_states_response
 
-        
 
     def get_curr_robot_config_callback(self, req):
         ### get the current robot config

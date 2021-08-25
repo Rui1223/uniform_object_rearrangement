@@ -54,8 +54,10 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   ArmTrajectory.msg
+  ArrState.msg
   CylinderObj.msg
   Edge.msg
+  ObjArrStates.msg
   ObjectRearrangePath.msg
 )
 

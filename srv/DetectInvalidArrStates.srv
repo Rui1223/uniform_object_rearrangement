@@ -5,4 +5,4 @@
 int32[] start_arrangement
 int32[] target_arrangement
 ---
-bool success
+uniform_object_rearrangement/ObjArrStates[] all_obj_invalid_arr_states

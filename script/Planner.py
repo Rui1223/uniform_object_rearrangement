@@ -370,7 +370,7 @@ class Planner(object):
             curr_object_configPoses = self.position_candidates_configPoses[curr_obj_position_idx]
         return curr_object_configPoses
     
-    def getConstraintsFromLabels(self, configPoses, target_arrangement, manipulation_mode):
+    def getConstraintsFromLabels(self, configPoses, obj_idx, target_arrangement, manipulation_mode):
         '''This function gets all objects target constraints from labels
         stored in the configPoses'''
         ### configPoses: a PositionCandidateConfigs object
@@ -386,7 +386,7 @@ class Planner(object):
             pose_labels = all_pose_labels[pose_i]
             configPoses_constraints.append([])
             for label in pose_labels:
-                if label in target_arrangement:
+                if (label in target_arrangement) and (target_arrangement.index(label) != obj_idx):
                     ### get the object_idx of the object that occupied that label at target arrangement
                     configPoses_constraints[pose_i].append(target_arrangement.index(label))
         return configPoses_constraints
