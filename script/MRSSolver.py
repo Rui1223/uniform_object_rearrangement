@@ -25,9 +25,9 @@ def enablePrint():
 
 
 class MRSSolver(MonotoneLocalSolver):
-    def __init__(self, startArrNode, target_arrangement, isLabeledRoadmapUsed=True):
+    def __init__(self, startArrNode, target_arrangement, time_allowed, isLabeledRoadmapUsed=True):
         MonotoneLocalSolver.__init__(
-            self, startArrNode, target_arrangement, isLabeledRoadmapUsed)
+            self, startArrNode, target_arrangement, time_allowed, isLabeledRoadmapUsed)
         rospy.logwarn("a MRSSolver start to work")
         
     def mrs_solve(self):

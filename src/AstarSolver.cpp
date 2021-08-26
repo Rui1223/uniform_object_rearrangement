@@ -302,12 +302,12 @@ void AstarSolver_t::back_track_path()
     m_path.push_back(current->m_id);
 
     std::reverse(m_path.begin(), m_path.end());
-    std::cout << "final path: \n";
-    for (auto const &e : m_path) {
-        std::cout << e << " ";
-    }
-    std::cout << "\n";
-    std::cout << "path cost: " << m_pathCost << "\n";
+    // std::cout << "final path: \n";
+    // for (auto const &e : m_path) {
+    //     std::cout << e << " ";
+    // }
+    // std::cout << "\n";
+    // std::cout << "path cost: " << m_pathCost << "\n";
 }
 
 void AstarSolver_t::pathToTrajectory(Graph_t &g)

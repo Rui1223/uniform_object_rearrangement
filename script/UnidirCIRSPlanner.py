@@ -26,19 +26,20 @@ def enablePrint():
 
 
 class UnidirCIRSPlanner(RearrangementTaskPlanner):
-    def __init__(self, initial_arrangement, final_arrangement, isLabeledRoadmapUsed=True):
+    def __init__(
+        self, initial_arrangement, final_arrangement, time_allowed, isLabeledRoadmapUsed=True):
         RearrangementTaskPlanner.__init__(
-            self, initial_arrangement, final_arrangement, isLabeledRoadmapUsed)
+            self, initial_arrangement, final_arrangement, time_allowed, isLabeledRoadmapUsed)
         rospy.logwarn("initialize an unidirectional CIRS planner")
 
-        self.growSubTree(self.treeL["L0"], self.final_arrangement, self.isLabeledRoadmapUsed)
+        self.growSubTree(self.treeL["L0"], self.final_arrangement, time_allowed, self.isLabeledRoadmapUsed)
         if self.isSolved:
             self.harvestSolution()
 
-    def growSubTree(self, rootNode, target_arrangement, isLabeledRoadmapUsed):
+    def growSubTree(self, rootNode, target_arrangement, time_allowed, isLabeledRoadmapUsed):
         ### (i) generate the subTree
         cirs_solver = CIRSSolver(
-            rootNode, target_arrangement, isLabeledRoadmapUsed)
+            rootNode, target_arrangement, time_allowed, isLabeledRoadmapUsed)
         local_task_success, subTree = cirs_solver.cirs_solve()
         ### (ii) engraft the subTree to the global search tree
         self.engraftingLeftTree(rootNode, subTree)

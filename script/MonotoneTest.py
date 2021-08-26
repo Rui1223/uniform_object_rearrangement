@@ -14,6 +14,10 @@ from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateI
 from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
 from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
 from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsRequest
+from uniform_object_rearrangement.srv import ResetPlanningInstance, ResetPlanningInstanceRequest
+from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceRequest
+from uniform_object_rearrangement.srv import ClearExecutionInstance, ClearExecutionInstanceRequest
+from uniform_object_rearrangement.srv import ResetRoadmap, ResetRoadmapRequest
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
@@ -45,16 +49,16 @@ class MonotoneTester(object):
         self.num_objects = int(args[1])
         self.instance_id = int(args[2])
         self.isNewInstance = True if args[3] == 'g' else False
-        self.method_name = args[4]
+        self.time_allowed = int(args[4])
 
     def saveInstance(self, num_objects, instance_id, cylinder_objects):
         ### create a folder denoted with specified (num_objects, instance_id)
         temp_instanceFolder = os.path.join(self.exampleFolder, str(num_objects), str(instance_id))
         if not os.path.exists(temp_instanceFolder):
             os.makedirs(temp_instanceFolder)
+        ################## write in the instance ####################
         instanceFile = temp_instanceFolder + "/" + "instance_info.txt"
         f_instance = open(instanceFile, "w")
-        ################## write in the instance ####################
         for cylinder_object in cylinder_objects:
             f_instance.write(str(cylinder_object.obj_idx) + "\n")
             f_instance.write(str(cylinder_object.curr_position.x) + " " + \
@@ -62,16 +66,18 @@ class MonotoneTester(object):
         f_instance.close()
         #############################################################
 
-    def saveSolution(self, num_objects, instance_id, solution_time, solution_object_ordering, method_name):
+    def saveSolution(self, num_objects, instance_id, all_methods_time, all_methods_success):
         temp_instanceFolder = os.path.join(self.exampleFolder, str(num_objects), str(instance_id))
-        solutionFile = temp_instanceFolder + "/" + method_name + ".txt"
-        f_solution = open(solutionFile, "w")
-        ################# write in the solution #####################
-        f_solution.write(str(solution_time) + "\n")
-        for obj_idx in solution_object_ordering:
-            f_solution.write(str(obj_idx) + " ")
-        f_solution.close()
-        #############################################################
+        timeFile = temp_instanceFolder + "/time.txt"
+        f_time = open(timeFile, "w")
+        for method_time in all_methods_time:
+            f_time.write(str(method_time) + "\n")
+        f_time.close()
+        successFile = temp_instanceFolder + "/success.txt"
+        f_success = open(successFile, "w")
+        for method_success in all_methods_success:
+            f_success.write(str(int(method_success)) + "\n")
+        f_success.close()
 
     def serviceCall_generateInstanceCylinder(self, num_objects, instance_number, isNewInstance):
         rospy.wait_for_service("generate_instance_cylinder")
@@ -124,6 +130,47 @@ class MonotoneTester(object):
             return generate_configs_for_start_positions_response.success
         except rospy.ServiceException as e:
             print("generate_configs_for_start_positions service call failed" % e)
+
+    def serviceCall_reset_planning_instance(self):
+        rospy.wait_for_service("reset_planning_instance")
+        request = ResetPlanningInstanceRequest()
+        try:
+            resetPlanningInstance_proxy = rospy.ServiceProxy("reset_planning_instance", ResetPlanningInstance)
+            reset_planning_instance_response = resetPlanningInstance_proxy(request)
+            return reset_planning_instance_response.success
+        except rospy.ServiceException as e:
+            print("reset_planning_instance service call failed: %s" % e)
+
+    def serviceCall_clear_planning_instance(self):
+        rospy.wait_for_service("clear_planning_instance")
+        request = ClearPlanningInstanceRequest()
+        try:
+            clearPlanningInstance_proxy = rospy.ServiceProxy("clear_planning_instance", ClearPlanningInstance)
+            clear_planning_instance_response = clearPlanningInstance_proxy(request)
+            return clear_planning_instance_response.success
+        except rospy.ServiceException as e:
+            print("clear_planning_instance service call failed: %s" % e)
+
+    def serviceCall_clear_execution_instance(self):
+        rospy.wait_for_service("clear_execution_instance")
+        request = ClearExecutionInstanceRequest()
+        try:
+            clearExecutionInstance_proxy = rospy.ServiceProxy("clear_execution_instance", ClearExecutionInstance)
+            clear_execution_instance_response = clearExecutionInstance_proxy(request)
+            return clear_execution_instance_response.success
+        except rospy.ServiceException as e:
+            print("clear_execution_instance service call failed: %s" % e)
+
+    def serviceCall_reset_roadmap(self, armType):
+        rospy.wait_for_service("reset_roadmap")
+        request = ResetRoadmapRequest()
+        request.armType = armType
+        try:
+            resetRoadmap_proxy = rospy.ServiceProxy("reset_roadmap", ResetRoadmap)
+            reset_roadmap_response = resetRoadmap_proxy(request)
+            return reset_roadmap_response.success
+        except rospy.ServiceException as e:
+            print("reset_roadmap service call failed: %s" % e)
 
     def serviceCall_execute_trajectory(self, traj):
         '''call the ExecuteTrajectory service to execute the given trajectory
@@ -193,6 +240,23 @@ class MonotoneTester(object):
 
         return execute_success
 
+    def resetInstance(self, armType):
+        reset_planning_success = self.serviceCall_reset_planning_instance()
+        reset_roadmap_success = self.serviceCall_reset_roadmap(armType)
+        if reset_planning_success and reset_roadmap_success:
+            return True
+        else:
+            return False
+
+    def clearInstance(self, armType):
+        clear_planning_success = self.serviceCall_clear_planning_instance()
+        clear_execution_success = self.serviceCall_clear_execution_instance()
+        reset_roadmap_success = self.serviceCall_reset_roadmap(armType)
+        if clear_planning_success and clear_execution_success and reset_roadmap_success:
+            return True
+        else:
+            return False
+
 
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
@@ -216,74 +280,128 @@ def main(args):
                 monotone_tester.serviceCall_reproduceInstanceCylinder(cylinder_objects)
         ### generate IK config for start positions for all objects
         ik_generate_success = monotone_tester.serviceCall_generateConfigsForStartPositions("Right_torso")
-
-        ####### now use the specified method to solve the instance #######
-        if monotone_tester.method_name == "DFS_DP_labeled":
-            start_time = time.time()
-            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement)
-            planning_time = time.time() - start_time
-            print("Time for DFS_DP_labeled planning is: {}".format(planning_time))
-            isSolved = unidir_dfsdp_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_dfsdp_planner.object_ordering
-                object_paths = unidir_dfsdp_planner.object_paths
-                print("object_ordering: {}".format(object_ordering))
-
-        if monotone_tester.method_name == "DFS_DP_nonlabeled":
-            start_time = time.time()
-            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
-            planning_time = time.time() - start_time
-            print("Time for DFS_DP_nonlabeled planning is: {}".format(planning_time))
-            isSolved = unidir_dfsdp_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_dfsdp_planner.object_ordering
-                object_paths = unidir_dfsdp_planner.object_paths
-                print("object_ordering: {}".format(object_ordering))
-
-        if monotone_tester.method_name == "mRS_labeled":
-            start_time = time.time()
-            unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement)
-            planning_time = time.time() - start_time
-            print("Time for mRS_labeled planning is: {}".format(planning_time))
-            isSolved = unidir_mrs_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_mrs_planner.object_ordering
-                object_paths = unidir_mrs_planner.object_paths
-                print("object_ordering: {}".format(object_ordering))
-
-        if monotone_tester.method_name == "mRS_nonlabeled":
-            start_time = time.time()
-            unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
-            planning_time = time.time() - start_time
-            print("Time for mRS_nonlabeled planning is: {}".format(planning_time))
-            isSolved = unidir_mrs_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_mrs_planner.object_ordering
-                object_paths = unidir_mrs_planner.object_paths
-                print("object_ordering: {}".format(object_ordering))
         
-        if monotone_tester.method_name == "CIRS":
-            start_time = time.time()
-            unidir_cirs_planner = UnidirCIRSPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=True)
-            planning_time = time.time() - start_time
-            print("Time for CIRS planning is: {}".format(planning_time))
-            isSolved = unidir_cirs_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_cirs_planner.object_ordering
-                object_paths = unidir_cirs_planner.object_paths
-                print("object_ordering: {}".format(object_ordering))
+        all_methods_time = []
+        all_methods_success = [] ### 0: fail, 1: success
+        ###### now using different methods to solve the instance ######
+        ### (i) DFS_DP_labeled
+        start_time = time.time()
+        unidir_dfsdp_planner = UnidirDFSDPPlanner(
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed)
+        DFS_DP_labeled_planning_time = time.time() - start_time
+        all_methods_time.append(DFS_DP_labeled_planning_time)
+        DFS_DP_labeled_isSolved = unidir_dfsdp_planner.isSolved
+        all_methods_success.append(DFS_DP_labeled_isSolved)
+        if DFS_DP_labeled_isSolved:
+            DFS_DP_labeled_object_ordering = unidir_dfsdp_planner.object_ordering
+            DFS_DP_labeled_object_paths = unidir_dfsdp_planner.object_paths
+        else:
+            DFS_DP_labeled_object_ordering = []
+            DFS_DP_labeled_object_paths = []
 
-        saveInstanceAndSolution = True if input("save instance & solution?(y/n)") == 'y' else False
-        print("save instance and solution: " + str(saveInstanceAndSolution))
-        if saveInstanceAndSolution:
-            monotone_tester.saveInstance(
-                monotone_tester.num_objects, monotone_tester.instance_id, cylinder_objects)
+        #####################################################################
+        reset_instance_success = monotone_tester.resetInstance("Right_torso")
+        #####################################################################
+
+        ### (ii) DFS_DP_nonlabeled
+        start_time = time.time()
+        unidir_dfsdp_planner = UnidirDFSDPPlanner(
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed, isLabeledRoadmapUsed=False)
+        DFS_DP_nonlabeled_planning_time = time.time() - start_time
+        all_methods_time.append(DFS_DP_nonlabeled_planning_time)
+        DFS_DP_nonlabeled_isSolved = unidir_dfsdp_planner.isSolved
+        all_methods_success.append(DFS_DP_nonlabeled_isSolved)
+        if DFS_DP_nonlabeled_isSolved:
+            DFS_DP_nonlabeled_object_ordering = unidir_dfsdp_planner.object_ordering
+            DFS_DP_nonlabeled_object_paths = unidir_dfsdp_planner.object_paths
+        else:
+            DFS_DP_nonlabeled_object_ordering = []
+            DFS_DP_nonlabeled_object_paths = []
+
+        #####################################################################
+        reset_instance_success = monotone_tester.resetInstance("Right_torso")
+        #####################################################################
+
+        ### (iii) mRS_labeled
+        start_time = time.time()
+        unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement, monotone_tester.time_allowed)
+        mRS_labeled_planning_time = time.time() - start_time
+        all_methods_time.append(mRS_labeled_planning_time)
+        mRS_labeled_isSolved = unidir_mrs_planner.isSolved
+        all_methods_success.append(mRS_labeled_isSolved)
+        if mRS_labeled_isSolved:
+            mRS_labeled_object_ordering = unidir_mrs_planner.object_ordering
+            mRS_labeled_object_paths = unidir_mrs_planner.object_paths
+        else:
+            mRS_labeled_object_ordering = []
+            mRS_labeled_object_paths = []
+
+        #####################################################################
+        reset_instance_success = monotone_tester.resetInstance("Right_torso")
+        #####################################################################
+
+        ### (iv) mRS_nonlabeled
+        start_time = time.time()
+        unidir_mrs_planner = UnidirMRSPlanner(
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed, isLabeledRoadmapUsed=False)
+        mRS_nonlabeled_planning_time = time.time() - start_time
+        all_methods_time.append(mRS_nonlabeled_planning_time)
+        mRS_nonlabeled_isSolved = unidir_mrs_planner.isSolved
+        all_methods_success.append(mRS_nonlabeled_isSolved)
+        if mRS_nonlabeled_isSolved:
+            mRS_nonlabeled_object_ordering = unidir_mrs_planner.object_ordering
+            mRS_nonlabeled_object_paths = unidir_mrs_planner.object_paths
+        else:
+            mRS_nonlabeled_object_ordering = []
+            mRS_nonlabeled_object_paths = []
+
+        #####################################################################
+        reset_instance_success = monotone_tester.resetInstance("Right_torso")
+        #####################################################################
+
+        ### (v) CIRS
+        start_time = time.time()
+        unidir_cirs_planner = UnidirCIRSPlanner(initial_arrangement, final_arrangement, monotone_tester.time_allowed)
+        cirs_planning_time = time.time() - start_time
+        all_methods_time.append(cirs_planning_time)
+        cirs_isSolved = unidir_cirs_planner.isSolved
+        all_methods_success.append(cirs_isSolved)
+        if cirs_isSolved:
+            cirs_object_ordering = unidir_cirs_planner.object_ordering
+            cirs_object_paths = unidir_cirs_planner.object_paths
+        else:
+            cirs_object_ordering = []
+            cirs_object_paths = []
+
+        print("\n")
+        print("Time for DFS_DP labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+        print("Object ordering for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_object_ordering))
+        print("\n")
+        print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
+        print("Object ordering for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_object_ordering))
+        print("\n")
+        print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
+        print("Object ordering for mRS_labeled planning is: {}".format(mRS_labeled_object_ordering))
+        print("\n")
+        print("Time for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_planning_time))
+        print("Object ordering for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_object_ordering))
+        print("\n")
+        print("Time for CIRS planning is: {}".format(cirs_planning_time))
+        print("Object ordering for CIRS planning is: {}".format(cirs_object_ordering))
+        print("\n")
+
+        if monotone_tester.isNewInstance:
+            ### only keep the option to save instance when it is a new instance
+            saveInstance = True if input("save instance? (y/n)") == 'y' else False
+            print("save instance: " + str(saveInstance))
+            if saveInstance:
+                monotone_tester.saveInstance(
+                    monotone_tester.num_objects, monotone_tester.instance_id, cylinder_objects)
+        saveSolution = True if input("save solution? (y/n)") == 'y' else False
+        print("save solution: " + str(saveSolution))
+        if saveSolution:
             monotone_tester.saveSolution(
-                monotone_tester.num_objects, monotone_tester.instance_id, \
-                planning_time, object_ordering, monotone_tester.method_name)
-        if isSolved:
-            input("enter to start the execution!!!!!")
-            execute_success = monotone_tester.executeWholePlan(object_paths)
+                monotone_tester.num_objects, monotone_tester.instance_id, all_methods_time, all_methods_success)
 
 
     while not rospy.is_shutdown():

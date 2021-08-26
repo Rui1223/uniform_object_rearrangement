@@ -30,7 +30,7 @@ def enablePrint():
 
 
 class MonotoneLocalSolver(object):
-    def __init__(self, startArrNode, target_arrangement, isLabeledRoadmapUsed=True):
+    def __init__(self, startArrNode, target_arrangement, time_allowed, isLabeledRoadmapUsed=True):
 
         ### understand the local arrangement task
         self.start_arrangement = startArrNode.arrangement
@@ -47,7 +47,7 @@ class MonotoneLocalSolver(object):
         self.tree[0] = startArrNode
 
         ### set the time limit
-        self.time_threshold = 600 ### 600s (10 minutes)
+        self.time_threshold = time_allowed
         self.local_planning_startTime = time.time()
 
 

@@ -291,8 +291,8 @@ def main(args):
             ### generate IK config for start positions for all objects
             ik_generate_success = monotone_experimenter.serviceCall_generateConfigsForStartPositions("Right_torso")
 
-            ########## now using different methods in the RearrangementTaskPlanner to solve the instance ##########
-            ## (i) DFS_DP_labeled
+            ########################## now using different methods to solve the instance ##########################
+            ### (i) DFS_DP_labeled
             start_time = time.time()
             unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement)
             DFS_DP_labeled_planning_time = time.time() - start_time
@@ -302,7 +302,7 @@ def main(args):
 
             reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
 
-            ## (ii) DFS_DP_nonlabeled
+            ### (ii) DFS_DP_nonlabeled
             start_time = time.time()
             unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
             DFS_DP_nonlabeled_planning_time = time.time() - start_time
@@ -312,7 +312,7 @@ def main(args):
 
             reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
 
-            ## (iii) mRS_labeled
+            ### (iii) mRS_labeled
             start_time = time.time()
             unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement)
             mRS_labeled_planning_time = time.time() - start_time

@@ -591,7 +591,7 @@ class Planner(object):
         # print("desired_pose: " + str(desired_ee_pose))
         # print("position error: " + str(ee_dist_pos))
         if ee_dist_pos > 0.012:
-            print("IK not reachable as position error exceeds 1.2cm: " + str(ee_dist_pos))
+            # print("IK not reachable as position error exceeds 1.2cm: " + str(ee_dist_pos))
             ### raise the flag
             isConfigValid = False
             FLAG = 1
@@ -600,7 +600,7 @@ class Planner(object):
             ### Now check orientation error
             ee_dist_quat = utils.computePoseDist_quat(actual_ee_pose[1], desired_ee_pose[1])
             if ee_dist_quat > 0.8:
-                print("IK not reachable as quaternion error exceeds 0.8: " + str(ee_dist_quat))
+                # print("IK not reachable as quaternion error exceeds 0.8: " + str(ee_dist_quat))
                 ### raise the flag
                 isConfigValid = False
                 FLAG = 1
@@ -1918,7 +1918,7 @@ class Planner(object):
             # print(singleArmConfig_IK_grasping)
             isIKValid, FLAG = self.checkSamplePoseIK(pose, robot, workspace, armType)
             if not isIKValid:
-                print("grasping pose not valid, FLAG: " + str(FLAG))
+                # print("grasping pose not valid, FLAG: " + str(FLAG))
                 num_trials += 1
                 continue
             ### check labels
@@ -1949,7 +1949,7 @@ class Planner(object):
             # print(singleArmConfig_IK_approaching)
             isIKValid, FLAG = self.checkSamplePoseIK(new_pose, robot, workspace, armType)
             if not isIKValid:
-                print("approaching pose not valid, FLAG: " + str(FLAG))
+                # print("approaching pose not valid, FLAG: " + str(FLAG))
                 num_trials += 1
                 continue
             ### check labels

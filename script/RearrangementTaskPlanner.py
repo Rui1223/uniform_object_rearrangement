@@ -30,7 +30,8 @@ def enablePrint():
 
 
 class RearrangementTaskPlanner(object):
-    def __init__(self, initial_arrangement, final_arrangement, isLabeledRoadmapUsed=True):
+    def __init__(
+        self, initial_arrangement, final_arrangement, time_allowed, isLabeledRoadmapUsed=True):
         
         ### understand the arrangement task
         self.initial_arrangement = initial_arrangement
@@ -60,7 +61,7 @@ class RearrangementTaskPlanner(object):
         self.leftLeaves = ["L0"] ### keep track of leaves in the left tree
 
         ### set the time limit
-        self.time_threshold = 600 ### 600s (10 minutes)
+        self.time_threshold = time_allowed
         self.planning_startTime = time.time()
 
         ### the solution to harvest

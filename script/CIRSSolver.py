@@ -27,9 +27,9 @@ def enablePrint():
 
 
 class CIRSSolver(MonotoneLocalSolver):
-    def __init__(self, startArrNode, target_arrangement, isLabeledRoadmapUsed=True):
+    def __init__(self, startArrNode, target_arrangement, time_allowed, isLabeledRoadmapUsed=True):
         MonotoneLocalSolver.__init__(
-            self, startArrNode, target_arrangement, isLabeledRoadmapUsed)
+            self, startArrNode, target_arrangement, time_allowed, isLabeledRoadmapUsed)
         rospy.logwarn("a CIRSSolver starts to work")
         self.explored = [] ### a list of arrangements which have been explored
 
