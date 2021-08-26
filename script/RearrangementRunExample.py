@@ -1,0 +1,166 @@
+#!/usr/bin/env python
+from __future__ import division
+
+import time
+import sys
+import os
+import numpy as np
+
+import utils2
+
+import rospy
+import rospkg
+
+from UnidirMRSPlanner import UnidirMRSPlanner
+from UnidirDFSDPPlanner import UnidirDFSDPPlanner
+from UnidirCIRSPlanner import UnidirCIRSPlanner
+
+############################### description #########################################
+### This class defines a ExampleRunner class which
+### solves an rearrangement problem/example with 
+### the number of the object specified
+### It
+### (1) asks the execution scene to generate an instance
+### (2) asks the pose estimator to get the object poses
+### (3) reproduces the instance in task planner 
+### (4) solves it with a specified method
+### (5) obtains the solution of the specified method
+### (6) asks the execution scene to execute the planned paths
+#####################################################################################
+
+class ExampleRunner(object):
+    def __init__(self, args):
+        ### set the rospkg path
+        rospack = rospkg.RosPack()
+        self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
+        self.exampleFolder = os.path.join(self.rosPackagePath, "examples")
+        if not os.path.exists(self.exampleFolder):
+            os.makedirs(self.exampleFolder)
+        self.num_objects = int(args[1])
+        self.instance_id = int(args[2])
+        self.isNewInstance = True if args[3] == 'g' else False
+        self.time_allowed = int(args[4])
+        self.method_name = args[5]
+
+
+    def rosInit(self):
+        ### This function specifies the role of a node instance for this class ###
+        ### and initializes a ros node
+        rospy.init_node("rearrangement_run_example", anonymous=True)
+
+
+def main(args):
+    example_runner = ExampleRunner(args)
+    example_runner.rosInit()
+    rate = rospy.Rate(10) ### 10hz
+
+    ### generate/load an instance in the execution scene
+    initialize_instance_success = utils2.serviceCall_generateInstanceCylinder(
+        example_runner.num_objects, example_runner.instance_id, example_runner.isNewInstance)
+    if initialize_instance_success:
+        ### object pose estimation
+        cylinder_objects = utils2.serviceCall_cylinderPositionEstimate()
+        ### reproduce the estimated object poses in the planning scene
+        initial_arrangement, final_arrangement, reproduce_instance_success = \
+                utils2.serviceCall_reproduceInstanceCylinder(cylinder_objects)
+        ### generate IK config for start positions for all objects
+        ik_generate_success = utils2.serviceCall_generateConfigsForStartPositions("Right_torso")
+
+        ###### run an example given the method specified ######
+        ### (i) DFS_DP_labeled
+        if example_runner.method_name == "DFS_DP_labeled":
+            start_time = time.time()
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed)
+            planning_time = time.time() - start_time
+            isSolved = unidir_dfsdp_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_dfsdp_planner.object_ordering
+                object_paths = unidir_dfsdp_planner.object_paths
+            else:
+                object_ordering = []
+                object_paths = []
+
+        ### (ii) DFS_DP_nonlabeled
+        if example_runner.method_name == "DFS_DP_nonlabeled":
+            start_time = time.time()
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed, isLabeledRoadmapUsed=False)
+            planning_time = time.time() - start_time
+            isSolved = unidir_dfsdp_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_dfsdp_planner.object_ordering
+                object_paths = unidir_dfsdp_planner.object_paths
+            else:
+                object_ordering = []
+                object_paths = []
+
+        ### (iii) mRS_labeled
+        if example_runner.method_name == "mRS_labeled":
+            start_time = time.time()
+            unidir_mrs_planner = UnidirMRSPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed)
+            planning_time = time.time() - start_time
+            isSolved = unidir_mrs_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_mrs_planner.object_ordering
+                object_paths = unidir_mrs_planner.object_paths
+            else:
+                object_ordering = []
+                object_paths = []
+        
+        ### (iv) mRS_nonlabeled
+        if example_runner.method_name == "mRS_nonlabeled":
+            start_time = time.time()
+            unidir_mrs_planner = UnidirMRSPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed, isLabeledRoadmapUsed=False)
+            planning_time = time.time() - start_time
+            isSolved = unidir_mrs_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_mrs_planner.object_ordering
+                object_paths = unidir_mrs_planner.object_paths
+            else:
+                object_ordering = []
+                object_paths = []
+
+        ### (v) CIRS
+        if example_runner.method_name == "CIRS":
+            start_time = time.time()
+            unidir_cirs_planner = UnidirCIRSPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed)
+            planning_time = time.time() - start_time
+            isSolved = unidir_cirs_planner.isSolved
+            if isSolved:
+                object_ordering = unidir_cirs_planner.object_ordering
+                object_paths = unidir_cirs_planner.object_paths
+            else:
+                object_ordering = []
+                object_paths = []
+
+        print("\n")
+        print("Time for {} planning is: {}".format(example_runner.method_name, planning_time))
+        print("Object ordering for {} planning is: {}".format(example_runner.method_name, object_ordering))
+
+        if example_runner.isNewInstance:
+            ### only keep the option to save instance when it is a new instance
+            saveInstance = True if input("save instance? (y/n)") == 'y' else False
+            print("save instance: " + str(saveInstance))
+            if saveInstance:
+                utils2.saveInstance(
+                    example_runner.num_objects, example_runner.instance_id, 
+                    cylinder_objects, example_runner.exampleFolder)
+        
+        if isSolved:
+            executePath = True if input("Solution found. Execute the solution? (y/n)") == 'y' else False
+            print("execute solution: " + str(executePath))
+            if executePath:
+                utils2.executeWholePlan(object_paths)
+        
+        print("exeunt")
+
+    while not rospy.is_shutdown():
+        rate.sleep()
+
+
+if __name__ == '__main__':
+    main(sys.argv)

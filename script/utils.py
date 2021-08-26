@@ -13,7 +13,7 @@ import time
 import IPython
 
 ### utils file contains some of the common functionalities
-### shared by lots of experimental setting
+### used often by different modules
 
 def norm2(v):
     norm = 0.0
