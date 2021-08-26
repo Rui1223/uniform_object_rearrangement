@@ -209,15 +209,31 @@ def clearInstance(armType):
     else:
         return False
 
-def saveInstance(num_objects, instance_id, cylinder_objects, rootFolder):
-    ### create a folder denoted with specified (num_objects, instance_id)
-    temp_instanceFolder = os.path.join(rootFolder, str(num_objects), str(instance_id))
-    if not os.path.exists(temp_instanceFolder):
-        os.makedirs(temp_instanceFolder)
-    instanceFile = temp_instanceFolder + "/" + "instance_info.txt"
+def saveInstance(cylinder_objects, instanceFolder):
+    ### create the instance folder specified
+    if not os.path.exists(instanceFolder):
+        os.makedirs(instanceFolder)
+    instanceFile = instanceFolder + "/" + "instance_info.txt"
     f_instance = open(instanceFile, "w")
     for cylinder_object in cylinder_objects:
         f_instance.write(str(cylinder_object.obj_idx) + "\n")
         f_instance.write(str(cylinder_object.curr_position.x) + " " + \
             str(cylinder_object.curr_position.y) + " " + str(cylinder_object.curr_position.z) + "\n")
     f_instance.close()
+
+def saveSolution(all_methods_time, all_methods_success, all_method_nActions, instanceFolder):
+    timeFile = instanceFolder + "/time.txt"
+    f_time = open(timeFile, "w")
+    for method_time in all_methods_time:
+        f_time.write(str(method_time) + "\n")
+    f_time.close()
+    successFile = instanceFolder + "/success.txt"
+    f_success = open(successFile, "w")
+    for method_success in all_methods_success:
+        f_success.write(str(int(method_success)) + "\n")
+    f_success.close()
+    nActionsFile = instanceFolder + "/actions.txt"
+    f_actions = open(nActionsFile, "w")
+    for method_nActions in all_method_nActions:
+        f_actions.write(str(method_nActions) + "\n")
+    f_actions.close()

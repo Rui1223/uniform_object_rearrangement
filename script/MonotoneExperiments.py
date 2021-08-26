@@ -6,23 +6,14 @@ import sys
 import os
 import numpy as np
 
+import utils2
+
 import rospy
 import rospkg
 
-from uniform_object_rearrangement.msg import CylinderObj
-from uniform_object_rearrangement.srv import GenerateInstanceCylinder, GenerateInstanceCylinderRequest
-from uniform_object_rearrangement.srv import CylinderPositionEstimate, CylinderPositionEstimateRequest
-from uniform_object_rearrangement.srv import ReproduceInstanceCylinder, ReproduceInstanceCylinderRequest
-from uniform_object_rearrangement.srv import GenerateConfigsForStartPositions, GenerateConfigsForStartPositionsRequest
-from uniform_object_rearrangement.srv import ResetPlanningInstance, ResetPlanningInstanceRequest
-from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceRequest
-from uniform_object_rearrangement.srv import ClearExecutionInstance, ClearExecutionInstanceRequest
-from uniform_object_rearrangement.srv import ResetRoadmap, ResetRoadmapRequest
-from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
-from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
-
 from UnidirMRSPlanner import UnidirMRSPlanner
-from UnidirDFSDPPlanner import UnidirDFSDPPlanner
+from UnidirDFSDPPlanner import 
+from UnidirCIRSPlanner import UnidirCIRSPlanner
 
 ############################### description ###########################################
 ### This class defines a MonotoneExperimenter class which
@@ -31,8 +22,8 @@ from UnidirDFSDPPlanner import UnidirDFSDPPlanner
 ### It
 ### (1) asks the execution scene to generate an instance
 ### (2) asks the pose estimator to get the object poses
-### (3) reproduces the instance in task planner and solve it with a specified planner
-### (4) asks the planning scene to plan the manipulation paths
+### (3) reproduces the instance in task planner 
+### (4) solves it with all methods
 ### (5) collect statistics (e.g., time/actions) from each method for comparison purpose
 #######################################################################################
 
@@ -48,27 +39,32 @@ class MonotoneExperimenter(object):
         self.numObjects_options = [7]
         self.numExperiments_perObject = int(args[1])
         self.maxInstancesNeed_perObject = int(args[2])
+        self.time_allowed = int(args[3])
+
 
     def createNumObjectsFolder(self, num_objects):
         ### create a folder denoted with specified num_objects
         temp_objectFolder = os.path.join(self.ExperimentsFolder, str(num_objects))
         if not os.path.exists(temp_objectFolder):
             os.makedirs(temp_objectFolder)
+        temp_nonMonotoneInstancesFolder = \
+            os.path.join(self.ExperimentsFolder, str(num_objects), "non_monotone_instances")
+        if not os.path.exists(temp_nonMonotoneInstancesFolder):
+            os.makedirs(temp_nonMonotoneInstancesFolder)
 
-    def saveInstance(self, num_objects, instance_id, cylinder_objects):
-        ### create a folder denoted with specified (num_objects, instance_id)
-        temp_instanceFolder = os.path.join(self.ExperimentsFolder, str(num_objects), str(instance_id))
-        if not os.path.exists(temp_instanceFolder):
-            os.makedirs(temp_instanceFolder)
-        instanceFile = temp_instanceFolder + "/" + "instance_info.txt"
-        f_instance = open(instanceFile, "w")
-        ################## write in the instance ####################
-        for cylinder_object in cylinder_objects:
-            f_instance.write(str(cylinder_object.obj_idx) + "\n")
-            f_instance.write(str(cylinder_object.curr_position.x) + " " + \
-                str(cylinder_object.curr_position.y) + " " + str(cylinder_object.curr_position.z) + "\n")
-        f_instance.close()
-        #############################################################
+    def initializeObjLevelStat(self):
+        ### initialize obj-level statistics variable
+        self.DFS_DP_labeled_success_obj = []
+        self.DFS_DP_nonlabeled_success_obj = []
+        self.mRS_labeled_success_obj = []
+        self.mRS_nonlabeled_success_obj = []
+        self.CIRS_success_obj = []
+        self.DFS_DP_labeled_time_obj = []
+        self.DFS_DP_nonlabeled_time_obj = []
+        self.mRS_labeled_time_obj = []
+        self.mRS_nonlabeled_time_obj = []
+        self.CIRS_time_obj = []
+
 
     def saveSolution(self, num_objects, instance_id, solution_time, solution_object_ordering, method_name):
         temp_instanceFolder = os.path.join(self.ExperimentsFolder, str(num_objects), str(instance_id))
@@ -80,185 +76,6 @@ class MonotoneExperimenter(object):
             f_solution.write(str(obj_idx) + " ")
         f_solution.close()
         #############################################################
-
-
-    def serviceCall_generateInstanceCylinder(self, num_objects, instance_number, isNewInstance):
-        rospy.wait_for_service("generate_instance_cylinder")
-        request = GenerateInstanceCylinderRequest()
-        request.num_objects = num_objects
-        request.instance_number = instance_number
-        request.isNewInstance = isNewInstance
-        try:
-            generateInstanceCylinder_proxy = rospy.ServiceProxy(
-                        "generate_instance_cylinder", GenerateInstanceCylinder)
-            generate_instance_cylinder_response = generateInstanceCylinder_proxy(
-                    request.num_objects, request.instance_number, request.isNewInstance)
-            return generate_instance_cylinder_response.success
-        except rospy.ServiceException as e:
-            print("generate_instance_cylinder service call failed: %s" % e)
-
-    def serviceCall_cylinderPositionEstimate(self):
-        rospy.wait_for_service("cylinder_position_estimate")
-        request = CylinderPositionEstimateRequest()
-        try:
-            cylinderPositionEstimate_proxy = rospy.ServiceProxy(
-                "cylinder_position_estimate", CylinderPositionEstimate)
-            cylinder_position_estimate_response = cylinderPositionEstimate_proxy(request)
-            return cylinder_position_estimate_response.cylinder_objects
-        except rospy.ServiceException as e:
-            print("cylinder_position_estimate service call failed: %s" % e)
-
-    def serviceCall_reproduceInstanceCylinder(self, cylinder_objects):
-        ### Input: cylinder_objects (CylinderObj[])
-        rospy.wait_for_service("reproduce_instance_cylinder")
-        request = ReproduceInstanceCylinderRequest(cylinder_objects)
-        try:
-            reproduceInstanceCylinder_proxy = rospy.ServiceProxy(
-                "reproduce_instance_cylinder", ReproduceInstanceCylinder)
-            reproduce_instance_cylinder_response = reproduceInstanceCylinder_proxy(request.cylinder_objects)
-            return list(reproduce_instance_cylinder_response.initial_arrangement), \
-                   list(reproduce_instance_cylinder_response.final_arrangement), \
-                   reproduce_instance_cylinder_response.success
-        except rospy.ServiceException as e:
-            print("reproduce_instance_cylinder service call failed: %s" % e)
-
-    def serviceCall_generateConfigsForStartPositions(self, armType):
-        rospy.wait_for_service("generate_configs_for_start_positions")
-        request = GenerateConfigsForStartPositionsRequest()
-        request.armType = armType
-        try:
-            generateConfigsForStartPositions_proxy = rospy.ServiceProxy(
-                "generate_configs_for_start_positions", GenerateConfigsForStartPositions)
-            generate_configs_for_start_positions_response = generateConfigsForStartPositions_proxy(request.armType)
-            return generate_configs_for_start_positions_response.success
-        except rospy.ServiceException as e:
-            print("generate_configs_for_start_positions service call failed" % e)
-
-    def serviceCall_reset_planning_instance(self):
-        rospy.wait_for_service("reset_planning_instance")
-        request = ResetPlanningInstanceRequest()
-        try:
-            resetPlanningInstance_proxy = rospy.ServiceProxy("reset_planning_instance", ResetPlanningInstance)
-            reset_planning_instance_response = resetPlanningInstance_proxy(request)
-            return reset_planning_instance_response.success
-        except rospy.ServiceException as e:
-            print("reset_planning_instance service call failed: %s" % e)
-
-    def serviceCall_clear_planning_instance(self):
-        rospy.wait_for_service("clear_planning_instance")
-        request = ClearPlanningInstanceRequest()
-        try:
-            clearPlanningInstance_proxy = rospy.ServiceProxy("clear_planning_instance", ClearPlanningInstance)
-            clear_planning_instance_response = clearPlanningInstance_proxy(request)
-            return clear_planning_instance_response.success
-        except rospy.ServiceException as e:
-            print("clear_planning_instance service call failed: %s" % e)
-
-    def serviceCall_clear_execution_instance(self):
-        rospy.wait_for_service("clear_execution_instance")
-        request = ClearExecutionInstanceRequest()
-        try:
-            clearExecutionInstance_proxy = rospy.ServiceProxy("clear_execution_instance", ClearExecutionInstance)
-            clear_execution_instance_response = clearExecutionInstance_proxy(request)
-            return clear_execution_instance_response.success
-        except rospy.ServiceException as e:
-            print("clear_execution_instance service call failed: %s" % e)
-
-    def serviceCall_reset_roadmap(self, armType):
-        rospy.wait_for_service("reset_roadmap")
-        request = ResetRoadmapRequest()
-        request.armType = armType
-        try:
-            resetRoadmap_proxy = rospy.ServiceProxy("reset_roadmap", ResetRoadmap)
-            reset_roadmap_response = resetRoadmap_proxy(request)
-            return reset_roadmap_response.success
-        except rospy.ServiceException as e:
-            print("reset_roadmap service call failed: %s" % e)
-
-    def serviceCall_execute_trajectory(self, traj):
-        '''call the ExecuteTrajectory service to execute the given trajectory
-        inputs
-        ======
-            traj (an ArmTrajectory object): the trajectory to execute
-        outputs
-        =======
-            success: indicator of whether the trajectory is executed successfully
-        '''
-        rospy.wait_for_service("execute_trajectory")
-        request = ExecuteTrajectoryRequest()
-        request.arm_trajectory = traj
-        try:
-            executeTraj_proxy = rospy.ServiceProxy("execute_trajectory", ExecuteTrajectory)
-            executeTraj_response = executeTraj_proxy(request.arm_trajectory)
-            return executeTraj_response.success
-        except rospy.ServiceException as e:
-            print("execute_trajectory service call failed: %s" % e)
-
-    def serviceCall_attach_object(self, attach, object_idx, armType):
-        """call the AttachObject service to attach/detach the corresponding object
-        inputs
-        ======
-            attach (bool): indicate the action of attach or detach
-            object_idx (int): the object to attach or detach
-            armType (string): "Left"/"Right"/"Left_torso"/"Right_torso"
-        outputs
-        =======
-            success: indicator of whether the attach/detach command is fulfilled
-        """
-        rospy.wait_for_service("attach_object")
-        request = AttachObjectRequest()
-        request.attach = attach
-        request.object_idx = object_idx
-        request.armType = armType
-        try:
-            attachObject_proxy = rospy.ServiceProxy("attach_object", AttachObject)
-            attachObject_response = attachObject_proxy(request.attach, request.object_idx, request.armType)
-            return attachObject_response.success
-        except rospy.ServiceException as e:
-            print(" attach_object service call failed: %s" % e)
-
-    def executeWholePlan(self, whole_path):
-        """ call the ExecuteTrajectory service to execute each trajectory in the path
-            also tell the robot to attach or detach the object among the motions 
-            inputs
-            ======
-                whole path (a list of ObjectRearrangementPath): a sequence of object paths
-            outputs
-            =======
-                execute_success (bool): indicate whether success or not
-        """
-        for path in whole_path:
-            ### first execute the transit trajectory in the path
-            execute_success = self.serviceCall_execute_trajectory(path.transit_trajectory)
-            ### now attach the object
-            attach_success = self.serviceCall_attach_object(
-                attach=True, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
-            ### then execute the transfer trajectory in the path
-            execute_success = self.serviceCall_execute_trajectory(path.transfer_trajectory)
-            ### now detach the object
-            attach_success = self.serviceCall_attach_object(
-                attach=False, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
-            ### finally execute the finish trajectory in the path
-            execute_success = self.serviceCall_execute_trajectory(path.finish_trajectory)
-
-        return execute_success
-
-    def resetInstance(self, armType):
-        reset_planning_success = self.serviceCall_reset_planning_instance()
-        reset_roadmap_success = self.serviceCall_reset_roadmap(armType)
-        if reset_planning_success and reset_roadmap_success:
-            return True
-        else:
-            return False
-
-    def clearInstance(self, armType):
-        clear_planning_success = self.serviceCall_clear_planning_instance()
-        clear_execution_success = self.serviceCall_clear_execution_instance()
-        reset_roadmap_success = self.serviceCall_reset_roadmap(armType)
-        if clear_planning_success and clear_execution_success and reset_roadmap_success:
-            return True
-        else:
-            return False
 
 
     def rosInit(self):
@@ -275,23 +92,43 @@ def main(args):
     for num_objects in monotone_experimenter.numObjects_options:
         ### create a folder for current num_objects
         monotone_experimenter.createNumObjectsFolder(num_objects)
+        monotone_experimenter.initializeObjLevelStat()
         num_monotoneInstancesSaved = 0
+        num_nonMonotoneInstancesSaved = 0
+
         for experiment_id in range(1, monotone_experimenter.numExperiments_perObject+1):
             ### first see if we already have enough instances
             if (num_monotoneInstancesSaved >= monotone_experimenter.maxInstancesNeed_perObject): break
             ### generate an instance in the execution scene
-            initialize_instance_success = monotone_experimenter.serviceCall_generateInstanceCylinder(
-                                                                num_objects, num_monotoneInstancesSaved+1, True)
+            initialize_instance_success = utils2.serviceCall_generateInstanceCylinder(
+                                                num_objects, num_monotoneInstancesSaved+1, True)
             if not initialize_instance_success: continue
             ### object pose estimation
-            cylinder_objects = monotone_experimenter.serviceCall_cylinderPositionEstimate()
+            cylinder_objects = utils2.serviceCall_cylinderPositionEstimate()
             ### reproduce the estimated object poses in the planning scene
             initial_arrangement, final_arrangement, reproduce_instance_success = \
-                    monotone_experimenter.serviceCall_reproduceInstanceCylinder(cylinder_objects)
+                    utils2.serviceCall_reproduceInstanceCylinder(cylinder_objects)
             ### generate IK config for start positions for all objects
-            ik_generate_success = monotone_experimenter.serviceCall_generateConfigsForStartPositions("Right_torso")
+            ik_generate_success = utils2.serviceCall_generateConfigsForStartPositions("Right_torso")
 
             ########################## now using different methods to solve the instance ##########################
+            ### (v) CIRS
+            start_time = time.time()
+            unidir_cirs_planner = UnidirCIRSPlanner(
+                initial_arrangement, final_arrangement, monotone_experimenter.time_allowed)
+            cirs_planning_time = time.time() - start_time
+            cirs_isSolved = unidir_cirs_planner.isSolved
+
+            if not cirs_isSolved:
+                ### the problem is not monotone
+                ### add this instance in the "non_monotone" subfolder
+                num_nonMonotoneInstancesSaved += 1
+                utils2.saveInstance(
+                    num_objects, num_nonMonotoneInstancesSaved, cylinder_objects, monotone_experimenter.ExperimentsFolder)
+
+                num_objects, num_monotoneInstancesSaved, cylinder_objects
+
+
             ### (i) DFS_DP_labeled
             start_time = time.time()
             unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement)

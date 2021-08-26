@@ -33,20 +33,18 @@ class ExampleRunner(object):
         ### set the rospkg path
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
-        self.exampleFolder = os.path.join(self.rosPackagePath, "examples")
-        if not os.path.exists(self.exampleFolder):
-            os.makedirs(self.exampleFolder)
         self.num_objects = int(args[1])
         self.instance_id = int(args[2])
         self.isNewInstance = True if args[3] == 'g' else False
         self.time_allowed = int(args[4])
         self.method_name = args[5]
-
+        self.instanceFolder = os.path.join(
+            self.rosPackagePath, "examples", str(self.num_objects), str(self.instance_id))
 
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
         ### and initializes a ros node
-        rospy.init_node("rearrangement_run_example", anonymous=True)
+        rospy.init_node("run_example", anonymous=True)
 
 
 def main(args):
@@ -146,9 +144,7 @@ def main(args):
             saveInstance = True if input("save instance? (y/n)") == 'y' else False
             print("save instance: " + str(saveInstance))
             if saveInstance:
-                utils2.saveInstance(
-                    example_runner.num_objects, example_runner.instance_id, 
-                    cylinder_objects, example_runner.exampleFolder)
+                utils2.saveInstance(cylinder_objects, example_runner.instanceFolder)
         
         if isSolved:
             executePath = True if input("Solution found. Execute the solution? (y/n)") == 'y' else False

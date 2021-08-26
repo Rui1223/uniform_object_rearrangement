@@ -66,8 +66,8 @@ class RearrangementTaskPlanner(object):
 
         ### the solution to harvest
         self.isSolved = False
-        self.best_solution_cost = np.inf
-        self.totalActions = 0 ### record the total number of actions
+        self.totalActions = np.inf ### record the total number of actions
+        self.best_solution_cost = self.totalActions
         self.object_ordering = [] ### a list of obj_idx (ordered)
         self.object_paths = [] ### a list of ObjectRearrangePath paths
 

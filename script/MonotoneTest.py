@@ -33,27 +33,12 @@ class MonotoneTester(object):
         ### set the rospkg path
         rospack = rospkg.RosPack()
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
-        self.exampleFolder = os.path.join(self.rosPackagePath, "examples")
-        if not os.path.exists(self.exampleFolder):
-            os.makedirs(self.exampleFolder)
         self.num_objects = int(args[1])
         self.instance_id = int(args[2])
         self.isNewInstance = True if args[3] == 'g' else False
         self.time_allowed = int(args[4])
-
-
-    def saveSolution(self, num_objects, instance_id, all_methods_time, all_methods_success):
-        temp_instanceFolder = os.path.join(self.exampleFolder, str(num_objects), str(instance_id))
-        timeFile = temp_instanceFolder + "/time.txt"
-        f_time = open(timeFile, "w")
-        for method_time in all_methods_time:
-            f_time.write(str(method_time) + "\n")
-        f_time.close()
-        successFile = temp_instanceFolder + "/success.txt"
-        f_success = open(successFile, "w")
-        for method_success in all_methods_success:
-            f_success.write(str(int(method_success)) + "\n")
-        f_success.close()
+        self.instanceFolder = os.path.join(
+            self.rosPackagePath, "examples", str(self.num_objects), str(self.instance_id))
 
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
@@ -80,21 +65,21 @@ def main(args):
         
         all_methods_time = []
         all_methods_success = [] ### 0: fail, 1: success
+        all_methods_nActions = []
         ###### now using different methods to solve the instance ######
         ### (i) DFS_DP_labeled
         start_time = time.time()
         unidir_dfsdp_planner = UnidirDFSDPPlanner(
             initial_arrangement, final_arrangement, monotone_tester.time_allowed)
         DFS_DP_labeled_planning_time = time.time() - start_time
-        all_methods_time.append(DFS_DP_labeled_planning_time)
         DFS_DP_labeled_isSolved = unidir_dfsdp_planner.isSolved
+        DFS_DP_labeled_nActions = unidir_dfsdp_planner.best_solution_cost
+        if DFS_DP_labeled_nActions == np.inf:
+            DFS_DP_labeled_nActions = 5000
+        DFS_DP_labeled_object_ordering = unidir_dfsdp_planner.object_ordering
+        all_methods_time.append(DFS_DP_labeled_planning_time)
         all_methods_success.append(DFS_DP_labeled_isSolved)
-        if DFS_DP_labeled_isSolved:
-            DFS_DP_labeled_object_ordering = unidir_dfsdp_planner.object_ordering
-            DFS_DP_labeled_object_paths = unidir_dfsdp_planner.object_paths
-        else:
-            DFS_DP_labeled_object_ordering = []
-            DFS_DP_labeled_object_paths = []
+        all_methods_nActions.append(DFS_DP_labeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
@@ -103,17 +88,17 @@ def main(args):
         ### (ii) DFS_DP_nonlabeled
         start_time = time.time()
         unidir_dfsdp_planner = UnidirDFSDPPlanner(
-            initial_arrangement, final_arrangement, monotone_tester.time_allowed, isLabeledRoadmapUsed=False)
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed, 
+            isLabeledRoadmapUsed=False)
         DFS_DP_nonlabeled_planning_time = time.time() - start_time
-        all_methods_time.append(DFS_DP_nonlabeled_planning_time)
         DFS_DP_nonlabeled_isSolved = unidir_dfsdp_planner.isSolved
+        DFS_DP_nonlabeled_nActions = unidir_dfsdp_planner.best_solution_cost
+        if DFS_DP_nonlabeled_nActions == np.inf:
+            DFS_DP_nonlabeled_nActions = 5000
+        DFS_DP_nonlabeled_object_ordering = unidir_dfsdp_planner.object_ordering
+        all_methods_time.append(DFS_DP_nonlabeled_planning_time)
         all_methods_success.append(DFS_DP_nonlabeled_isSolved)
-        if DFS_DP_nonlabeled_isSolved:
-            DFS_DP_nonlabeled_object_ordering = unidir_dfsdp_planner.object_ordering
-            DFS_DP_nonlabeled_object_paths = unidir_dfsdp_planner.object_paths
-        else:
-            DFS_DP_nonlabeled_object_ordering = []
-            DFS_DP_nonlabeled_object_paths = []
+        all_methods_nActions.append(DFS_DP_nonlabeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
@@ -121,17 +106,17 @@ def main(args):
 
         ### (iii) mRS_labeled
         start_time = time.time()
-        unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement, monotone_tester.time_allowed)
+        unidir_mrs_planner = UnidirMRSPlanner(
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed)
         mRS_labeled_planning_time = time.time() - start_time
-        all_methods_time.append(mRS_labeled_planning_time)
         mRS_labeled_isSolved = unidir_mrs_planner.isSolved
+        mRS_labeled_nActions = unidir_mrs_planner.best_solution_cost
+        if mRS_labeled_nActions == np.inf:
+            mRS_labeled_nActions = 5000
+        mRS_labeled_object_ordering = unidir_mrs_planner.object_ordering
+        all_methods_time.append(mRS_labeled_planning_time)
         all_methods_success.append(mRS_labeled_isSolved)
-        if mRS_labeled_isSolved:
-            mRS_labeled_object_ordering = unidir_mrs_planner.object_ordering
-            mRS_labeled_object_paths = unidir_mrs_planner.object_paths
-        else:
-            mRS_labeled_object_ordering = []
-            mRS_labeled_object_paths = []
+        all_methods_nActions.append(mRS_labeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
@@ -140,17 +125,17 @@ def main(args):
         ### (iv) mRS_nonlabeled
         start_time = time.time()
         unidir_mrs_planner = UnidirMRSPlanner(
-            initial_arrangement, final_arrangement, monotone_tester.time_allowed, isLabeledRoadmapUsed=False)
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed, 
+            isLabeledRoadmapUsed=False)
         mRS_nonlabeled_planning_time = time.time() - start_time
-        all_methods_time.append(mRS_nonlabeled_planning_time)
         mRS_nonlabeled_isSolved = unidir_mrs_planner.isSolved
+        mRS_nonlabeled_nActions = unidir_mrs_planner.best_solution_cost
+        if mRS_nonlabeled_nActions == np.inf:
+            mRS_nonlabeled_nActions = 5000
+        mRS_nonlabeled_object_ordering = unidir_mrs_planner.object_ordering
+        all_methods_time.append(mRS_nonlabeled_planning_time)
         all_methods_success.append(mRS_nonlabeled_isSolved)
-        if mRS_nonlabeled_isSolved:
-            mRS_nonlabeled_object_ordering = unidir_mrs_planner.object_ordering
-            mRS_nonlabeled_object_paths = unidir_mrs_planner.object_paths
-        else:
-            mRS_nonlabeled_object_ordering = []
-            mRS_nonlabeled_object_paths = []
+        all_methods_nActions.append(mRS_nonlabeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
@@ -158,32 +143,37 @@ def main(args):
 
         ### (v) CIRS
         start_time = time.time()
-        unidir_cirs_planner = UnidirCIRSPlanner(initial_arrangement, final_arrangement, monotone_tester.time_allowed)
+        unidir_cirs_planner = UnidirCIRSPlanner(
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed)
         cirs_planning_time = time.time() - start_time
-        all_methods_time.append(cirs_planning_time)
         cirs_isSolved = unidir_cirs_planner.isSolved
+        cirs_nActions = unidir_cirs_planner.best_solution_cost
+        if cirs_nActions == np.inf:
+            cirs_nActions = 5000
+        cirs_object_ordering = unidir_cirs_planner.object_ordering
+        all_methods_time.append(cirs_planning_time)
         all_methods_success.append(cirs_isSolved)
-        if cirs_isSolved:
-            cirs_object_ordering = unidir_cirs_planner.object_ordering
-            cirs_object_paths = unidir_cirs_planner.object_paths
-        else:
-            cirs_object_ordering = []
-            cirs_object_paths = []
+        all_methods_nActions.append(cirs_nActions)
 
         print("\n")
-        print("Time for DFS_DP labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+        print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+        print("Number of actions for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_nActions))
         print("Object ordering for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_object_ordering))
         print("\n")
         print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
+        print("Number of actions for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_nActions))
         print("Object ordering for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_object_ordering))
         print("\n")
         print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
+        print("Number of actions for mRS_labeled planning is: {}".format(mRS_labeled_nActions))
         print("Object ordering for mRS_labeled planning is: {}".format(mRS_labeled_object_ordering))
         print("\n")
         print("Time for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_planning_time))
+        print("Number of actions for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_nActions))
         print("Object ordering for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_object_ordering))
         print("\n")
         print("Time for CIRS planning is: {}".format(cirs_planning_time))
+        print("Number of actions for CIRS planning: {}".format(cirs_nActions))
         print("Object ordering for CIRS planning is: {}".format(cirs_object_ordering))
         print("\n")
 
@@ -198,8 +188,8 @@ def main(args):
         saveSolution = True if input("save solution? (y/n)") == 'y' else False
         print("save solution: " + str(saveSolution))
         if saveSolution:
-            monotone_tester.saveSolution(
-                monotone_tester.num_objects, monotone_tester.instance_id, all_methods_time, all_methods_success)
+            utils2.saveSolution(all_methods_time, all_methods_success, all_methods_nActions,
+                                monotone_tester.instanceFolder)
 
     while not rospy.is_shutdown():
         rate.sleep()
