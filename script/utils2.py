@@ -230,7 +230,7 @@ def saveSolution(all_methods_time, all_methods_success, all_method_nActions, ins
     successFile = instanceFolder + "/success.txt"
     f_success = open(successFile, "w")
     for method_success in all_methods_success:
-        f_success.write(str(int(method_success)) + "\n")
+        f_success.write(str(method_success) + "\n")
     f_success.close()
     nActionsFile = instanceFolder + "/actions.txt"
     f_actions = open(nActionsFile, "w")

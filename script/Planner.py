@@ -2032,6 +2032,63 @@ class Planner(object):
         #     print("\n")        
     ###################################################################################################################
 
+    #########################################################################################
+    def generatePosesForAllCandidates(self, robot, workspace, armType):
+        self.position_candidates_configPoses = OrderedDict()
+        cylinder_positions_geometries = {
+            candidate.position_idx : candidate.geo for candidate in workspace.candidate_geometries.values()}
+        for candidate_idx, cylinder_candidate in workspace.candidate_geometries.items():
+            print("++++++++++++++CANDIDATE_IDX: " + str(candidate_idx) + "++++++++++++++")
+            self.position_candidates_configPoses[candidate_idx] = PositionCandidateConfigs(candidate_idx)
+            ### first generate graspingPose_candidates with different orientations
+            graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos, workspace.cylinder_height)
+            for pose_id, graspingPose in enumerate(graspingPose_candidates):
+                approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
+                    self.generateConfigBasedOnPose_candidates(
+                        graspingPose, robot, workspace, armType, cylinder_positions_geometries)
+                if approaching_config != []:
+                    self.position_candidates_configPoses[candidate_idx].approaching_configs.append(approaching_config)
+                    self.position_candidates_configPoses[candidate_idx].grasping_configs.append(grasping_config)
+                    self.position_candidates_configPoses[candidate_idx].approaching_labels.append(approaching_label)
+                    self.position_candidates_configPoses[candidate_idx].grasping_labels.append(grasping_label)
+                    self.position_candidates_configPoses[candidate_idx].total_labels.append(total_label)
+
+            print("=============================================================================")
+            print("candidate " + str(candidate_idx) + " approaching_configs: ", \
+                self.position_candidates_configPoses[candidate_idx].approaching_configs)
+            print("candidate " + str(candidate_idx) + " grasping_configs: ", 
+                self.position_candidates_configPoses[candidate_idx].grasping_configs)
+            print("candidate " + str(candidate_idx) + " approaching_labels: ", \
+                self.position_candidates_configPoses[candidate_idx].approaching_labels)
+            print("candidate " + str(candidate_idx) + " grasping_labels: ", \
+                self.position_candidates_configPoses[candidate_idx].grasping_labels)
+            print("candidate " + str(candidate_idx) + " total_labels: ", \
+                self.position_candidates_configPoses[candidate_idx].total_labels)
+            input("ENTER to next candidate")
+        
+        ### wooo!!! finished!
+        ### save the whole position_candidates_configPoses
+        self.serializeCandidatesConfigPoses()
+    #########################################################################################
+
+    #########################################################################################
+    def generatePoses_IKdataSet(self, robot, workspace, armType):
+        cylinder_positions_geometries = {
+            candidate.position_idx : candidate.geo for candidate in workspace.candidate_geometries.values()}
+        generateMore = True
+        while(generateMore):
+            candidate_idx = int(input('which candidate_idx are you interested?'))
+            cylinder_candidate = workspace.candidate_geometries[candidate_idx]
+            print("++++++++++++++CANDIDATE_IDX: " + str(candidate_idx) + "++++++++++++++")
+            ### first generate graspingPose_candidates with different orientations
+            graspingPose_candidates = self.generate_pose_candidates(cylinder_candidate.pos, workspace.cylinder_height)
+            for pose_id, graspingPose in enumerate(graspingPose_candidates):
+                approaching_config, grasping_config, approaching_label, grasping_label, total_label = \
+                    self.generateConfigBasedOnPose_candidates(
+                        graspingPose, robot, workspace, armType, cylinder_positions_geometries)
+
+            generateMore = True if input('generate more? (y/n)') == 'y' else False
+    #########################################################################################
 
     def serializeCandidatesConfigPoses(self):
         f_candidate_geometries = open(self.roadmapFolder+"/CandidatesConfigPoses.obj", 'wb')
@@ -2040,6 +2097,76 @@ class Planner(object):
     def deserializeCandidatesConfigPoses(self):
         f_candidate_geometries = open(self.roadmapFolder+"/CandidatesConfigPoses.obj", 'rb')
         self.position_candidates_configPoses = pickle.load(f_candidate_geometries)
+
+    #########################################################################################
+    ### ATTENTION: THE FUNCTION BELOW IS NOT USED AND THUS NOT BEING MAINTAINED AT THIS POINT
+    def calculateReachabilityMap(self, robot, workspace, orientation, placeholder_shape="cylinder"):
+        ### calculate the reachability map for a particular orientation
+        ### mark with the shape of different color specified
+        ### Input: orientation is a format of quaternion (x,y,z,w)
+        ### set up the two dictionaries as the mapping
+        flag_color = {
+            0: [0,1,0,1],
+            1: [1,0,0,1],
+            2: [0,0,1,1],
+            3: [1,1,0,1]
+        }
+        obj_idx = 0
+        for object_pos in workspace.all_goal_positions.values():
+            print("current obj_idx: {}".format(obj_idx))
+            temp_pos = copy.deepcopy(object_pos)
+            temp_pos[2] = object_pos[2] + workspace.cylinder_height/2 - 0.03
+            target_pose = [temp_pos, orientation]
+            ### first check the pose
+            isPoseValid, FLAG, configToPickingPose = self.generateConfigBasedOnPose(
+                        target_pose, obj_idx, robot, workspace, "Right_torso")
+            if not isPoseValid:
+                print("the pose is not valid")
+                if placeholder_shape == "cylinder":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                        radius=workspace.cylinder_radius, length=workspace.cylinder_height, 
+                        rgbaColor=flag_color[FLAG], physicsClientId=self.planningServer)
+                if placeholder_shape == "sphere":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_SPHERE,
+                        radius=0.005, rgbaColor=flag_color[FLAG], physicsClientId=self.planningServer)
+                temp_placeholderM = p.createMultiBody(
+                    baseVisualShapeIndex=temp_placeholder_v, basePosition=object_pos, physicsClientId=self.planningServer)
+            else:
+                ### then check the pre-grasp pose
+                isPoseValid, FLAG, prePickingPose, configToPrePickingPose = \
+                    self.generatePrePickingPose(
+                        target_pose, obj_idx, robot, workspace, "Right_torso")
+                if not isPoseValid:
+                    print("the pre-picking pose is not valid")
+                    if placeholder_shape == "cylinder":
+                        temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                            radius=workspace.cylinder_radius, length=workspace.cylinder_height, 
+                            rgbaColor=flag_color[FLAG], physicsClientId=self.planningServer)
+                    if placeholder_shape == "sphere":
+                        temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_SPHERE,
+                            radius=0.005, rgbaColor=flag_color[FLAG], physicsClientId=self.planningServer)
+                    temp_placeholderM = p.createMultiBody(
+                        baseVisualShapeIndex=temp_placeholder_v, basePosition=object_pos, physicsClientId=self.planningServer)
+            if isPoseValid:
+                print("both picking and pre-picking poses are valid")
+                if placeholder_shape == "cylinder":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_CYLINDER,
+                        radius=workspace.cylinder_radius, length=workspace.cylinder_height, 
+                        rgbaColor=flag_color[FLAG], physicsClientId=self.planningServer)
+                if placeholder_shape == "sphere":
+                    temp_placeholder_v = p.createVisualShape(shapeType=p.GEOM_SPHERE,
+                        radius=0.005, rgbaColor=flag_color[FLAG], physicsClientId=self.planningServer)
+                temp_placeholderM = p.createMultiBody(
+                    baseVisualShapeIndex=temp_placeholder_v, basePosition=object_pos, physicsClientId=self.planningServer)
+            print("finish the object {}".format(obj_idx))
+            obj_idx += 1
+            input("press to continue")
+        ### out of the loop
+        robot.resetArmConfig_torso(
+            robot.leftArmHomeConfiguration+robot.rightArmHomeConfiguration, robot.torsoHomeConfiguration)
+        time.sleep(10000)
+    #########################################################################################
+
 
 class PositionCandidateConfigs(object):
     def __init__(self, position_idx):

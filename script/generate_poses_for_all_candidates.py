@@ -20,10 +20,12 @@ def main(args):
     print("Let's generate multiple poses for each position candidate")
     pybullet_plan_scene = PybulletPlanScene(args)
 
-    ### first geneate all position candidates
-    # pybullet_plan_scene.workspace_p.generateCandidatesGeometry()
-    pybullet_plan_scene.generatePosesForAllCandidates("Right_torso")
-    # pybullet_plan_scene.generatePoses_IKdateSet("Right_torso")
+    ### option 1: generates poses for all position candidate
+    pybullet_plan_scene.planner_p.generatePosesForAllCandidates(
+        pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "Right_torso")
+    ### option 2: generates a high-quality IK dataset
+    # pybullet_plan_scene.planner_p.generatePoses_IKdataSet(
+    #     pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "Right_torso")
 
     time.sleep(10000)
 

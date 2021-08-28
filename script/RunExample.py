@@ -65,78 +65,44 @@ def main(args):
         ik_generate_success = utils2.serviceCall_generateConfigsForStartPositions("Right_torso")
 
         ###### run an example given the method specified ######
-        ### (i) DFS_DP_labeled
-        if example_runner.method_name == "DFS_DP_labeled":
-            start_time = time.time()
-            unidir_dfsdp_planner = UnidirDFSDPPlanner(
-                initial_arrangement, final_arrangement, example_runner.time_allowed)
-            planning_time = time.time() - start_time
-            isSolved = unidir_dfsdp_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_dfsdp_planner.object_ordering
-                object_paths = unidir_dfsdp_planner.object_paths
-            else:
-                object_ordering = []
-                object_paths = []
-
-        ### (ii) DFS_DP_nonlabeled
-        if example_runner.method_name == "DFS_DP_nonlabeled":
-            start_time = time.time()
-            unidir_dfsdp_planner = UnidirDFSDPPlanner(
-                initial_arrangement, final_arrangement, example_runner.time_allowed, isLabeledRoadmapUsed=False)
-            planning_time = time.time() - start_time
-            isSolved = unidir_dfsdp_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_dfsdp_planner.object_ordering
-                object_paths = unidir_dfsdp_planner.object_paths
-            else:
-                object_ordering = []
-                object_paths = []
-
-        ### (iii) mRS_labeled
-        if example_runner.method_name == "mRS_labeled":
-            start_time = time.time()
-            unidir_mrs_planner = UnidirMRSPlanner(
-                initial_arrangement, final_arrangement, example_runner.time_allowed)
-            planning_time = time.time() - start_time
-            isSolved = unidir_mrs_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_mrs_planner.object_ordering
-                object_paths = unidir_mrs_planner.object_paths
-            else:
-                object_ordering = []
-                object_paths = []
-        
-        ### (iv) mRS_nonlabeled
-        if example_runner.method_name == "mRS_nonlabeled":
-            start_time = time.time()
-            unidir_mrs_planner = UnidirMRSPlanner(
-                initial_arrangement, final_arrangement, example_runner.time_allowed, isLabeledRoadmapUsed=False)
-            planning_time = time.time() - start_time
-            isSolved = unidir_mrs_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_mrs_planner.object_ordering
-                object_paths = unidir_mrs_planner.object_paths
-            else:
-                object_ordering = []
-                object_paths = []
-
-        ### (v) CIRS
+        ### (i) CIRS
         if example_runner.method_name == "CIRS":
             start_time = time.time()
-            unidir_cirs_planner = UnidirCIRSPlanner(
+            the_chosen_planner = UnidirCIRSPlanner(
                 initial_arrangement, final_arrangement, example_runner.time_allowed)
-            planning_time = time.time() - start_time
-            isSolved = unidir_cirs_planner.isSolved
-            if isSolved:
-                object_ordering = unidir_cirs_planner.object_ordering
-                object_paths = unidir_cirs_planner.object_paths
-            else:
-                object_ordering = []
-                object_paths = []
+        ### (ii) DFS_DP_labeled
+        if example_runner.method_name == "DFS_DP_labeled":
+            start_time = time.time()
+            the_chosen_planner = UnidirDFSDPPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed)
+        ### (iii) DFS_DP_nonlabeled
+        if example_runner.method_name == "DFS_DP_nonlabeled":
+            start_time = time.time()
+            the_chosen_planner = UnidirDFSDPPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed, \
+                isLabeledRoadmapUsed=False)
+        ### (iv) mRS_labeled
+        if example_runner.method_name == "mRS_labeled":
+            start_time = time.time()
+            the_chosen_planner = UnidirMRSPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed)
+        ### (v) mRS_nonlabeled
+        if example_runner.method_name == "mRS_nonlabeled":
+            start_time = time.time()
+            the_chosen_planner = UnidirMRSPlanner(
+                initial_arrangement, final_arrangement, example_runner.time_allowed, \
+                isLabeledRoadmapUsed=False)
+
+        planning_time = time.time() - start_time
+        isSolved = the_chosen_planner.isSolved
+        nActions = the_chosen_planner.best_solution_cost
+        if nActions == np.inf: nActions = 5000
+        object_ordering = the_chosen_planner.object_ordering
+        object_paths = the_chosen_planner.object_paths        
 
         print("\n")
         print("Time for {} planning is: {}".format(example_runner.method_name, planning_time))
+        print("Number of actions for {} planning is: {}".format(example_runner.method_name, nActions))
         print("Object ordering for {} planning is: {}".format(example_runner.method_name, object_ordering))
 
         if example_runner.isNewInstance:

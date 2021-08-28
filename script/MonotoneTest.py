@@ -66,8 +66,27 @@ def main(args):
         all_methods_time = []
         all_methods_success = [] ### 0: fail, 1: success
         all_methods_nActions = []
+
         ###### now using different methods to solve the instance ######
-        ### (i) DFS_DP_labeled
+        ### (i) CIRS
+        start_time = time.time()
+        unidir_cirs_planner = UnidirCIRSPlanner(
+            initial_arrangement, final_arrangement, monotone_tester.time_allowed)
+        cirs_planning_time = time.time() - start_time
+        cirs_isSolved = unidir_cirs_planner.isSolved
+        cirs_nActions = unidir_cirs_planner.best_solution_cost
+        if cirs_nActions == np.inf:
+            cirs_nActions = 5000
+        cirs_object_ordering = unidir_cirs_planner.object_ordering
+        all_methods_time.append(cirs_planning_time)
+        all_methods_success.append(float(cirs_isSolved))
+        all_methods_nActions.append(cirs_nActions)
+
+        #####################################################################
+        reset_instance_success = utils2.resetInstance("Right_torso")
+        #####################################################################
+
+        ### (ii) DFS_DP_labeled
         start_time = time.time()
         unidir_dfsdp_planner = UnidirDFSDPPlanner(
             initial_arrangement, final_arrangement, monotone_tester.time_allowed)
@@ -78,14 +97,14 @@ def main(args):
             DFS_DP_labeled_nActions = 5000
         DFS_DP_labeled_object_ordering = unidir_dfsdp_planner.object_ordering
         all_methods_time.append(DFS_DP_labeled_planning_time)
-        all_methods_success.append(DFS_DP_labeled_isSolved)
+        all_methods_success.append(float(DFS_DP_labeled_isSolved))
         all_methods_nActions.append(DFS_DP_labeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
         #####################################################################
 
-        ### (ii) DFS_DP_nonlabeled
+        ### (iii) DFS_DP_nonlabeled
         start_time = time.time()
         unidir_dfsdp_planner = UnidirDFSDPPlanner(
             initial_arrangement, final_arrangement, monotone_tester.time_allowed, 
@@ -97,14 +116,14 @@ def main(args):
             DFS_DP_nonlabeled_nActions = 5000
         DFS_DP_nonlabeled_object_ordering = unidir_dfsdp_planner.object_ordering
         all_methods_time.append(DFS_DP_nonlabeled_planning_time)
-        all_methods_success.append(DFS_DP_nonlabeled_isSolved)
+        all_methods_success.append(float(DFS_DP_nonlabeled_isSolved))
         all_methods_nActions.append(DFS_DP_nonlabeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
         #####################################################################
 
-        ### (iii) mRS_labeled
+        ### (iv) mRS_labeled
         start_time = time.time()
         unidir_mrs_planner = UnidirMRSPlanner(
             initial_arrangement, final_arrangement, monotone_tester.time_allowed)
@@ -115,14 +134,14 @@ def main(args):
             mRS_labeled_nActions = 5000
         mRS_labeled_object_ordering = unidir_mrs_planner.object_ordering
         all_methods_time.append(mRS_labeled_planning_time)
-        all_methods_success.append(mRS_labeled_isSolved)
+        all_methods_success.append(float(mRS_labeled_isSolved))
         all_methods_nActions.append(mRS_labeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
         #####################################################################
 
-        ### (iv) mRS_nonlabeled
+        ### (v) mRS_nonlabeled
         start_time = time.time()
         unidir_mrs_planner = UnidirMRSPlanner(
             initial_arrangement, final_arrangement, monotone_tester.time_allowed, 
@@ -134,47 +153,38 @@ def main(args):
             mRS_nonlabeled_nActions = 5000
         mRS_nonlabeled_object_ordering = unidir_mrs_planner.object_ordering
         all_methods_time.append(mRS_nonlabeled_planning_time)
-        all_methods_success.append(mRS_nonlabeled_isSolved)
+        all_methods_success.append(float(mRS_nonlabeled_isSolved))
         all_methods_nActions.append(mRS_nonlabeled_nActions)
 
         #####################################################################
         reset_instance_success = utils2.resetInstance("Right_torso")
         #####################################################################
 
-        ### (v) CIRS
-        start_time = time.time()
-        unidir_cirs_planner = UnidirCIRSPlanner(
-            initial_arrangement, final_arrangement, monotone_tester.time_allowed)
-        cirs_planning_time = time.time() - start_time
-        cirs_isSolved = unidir_cirs_planner.isSolved
-        cirs_nActions = unidir_cirs_planner.best_solution_cost
-        if cirs_nActions == np.inf:
-            cirs_nActions = 5000
-        cirs_object_ordering = unidir_cirs_planner.object_ordering
-        all_methods_time.append(cirs_planning_time)
-        all_methods_success.append(cirs_isSolved)
-        all_methods_nActions.append(cirs_nActions)
-
+        print("\n")
+        print("Time for CIRS planning is: {}".format(cirs_planning_time))
+        print("Success for CIRS planning is: {}".format(cirs_isSolved))
+        print("Number of actions for CIRS planning: {}".format(cirs_nActions))
+        print("Object ordering for CIRS planning is: {}".format(cirs_object_ordering))
         print("\n")
         print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+        print("Success for DFS_DP_labeled_planning is: {}".format(DFS_DP_labeled_isSolved))
         print("Number of actions for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_nActions))
         print("Object ordering for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_object_ordering))
         print("\n")
         print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
+        print("Success for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_isSolved))
         print("Number of actions for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_nActions))
         print("Object ordering for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_object_ordering))
         print("\n")
         print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
+        print("Success for mRS_labeled planning is: {}".format(mRS_labeled_isSolved))
         print("Number of actions for mRS_labeled planning is: {}".format(mRS_labeled_nActions))
         print("Object ordering for mRS_labeled planning is: {}".format(mRS_labeled_object_ordering))
         print("\n")
         print("Time for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_planning_time))
+        print("Success for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_isSolved))
         print("Number of actions for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_nActions))
         print("Object ordering for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_object_ordering))
-        print("\n")
-        print("Time for CIRS planning is: {}".format(cirs_planning_time))
-        print("Number of actions for CIRS planning: {}".format(cirs_nActions))
-        print("Object ordering for CIRS planning is: {}".format(cirs_object_ordering))
         print("\n")
 
         if monotone_tester.isNewInstance:

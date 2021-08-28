@@ -75,6 +75,9 @@ class DFSDPSolver(MonotoneLocalSolver):
                 if FLAG:
                     return FLAG
                 else:
+                    ### first check if FLAG == False is due to timeout, if it is, just return
+                    if time.time() - self.local_planning_startTime >= self.time_threshold:
+                        return FLAG
                     ### put the object and robot back to the configuration they belong to
                     ### at the beginning of the function call
                     self.revertBackToParentNode(current_node_id, obj_idx, obj_curr_position_idx, "Right_torso")

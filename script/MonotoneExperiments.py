@@ -12,7 +12,7 @@ import rospy
 import rospkg
 
 from UnidirMRSPlanner import UnidirMRSPlanner
-from UnidirDFSDPPlanner import 
+from UnidirDFSDPPlanner import UnidirDFSDPPlanner
 from UnidirCIRSPlanner import UnidirCIRSPlanner
 
 ############################### description ###########################################
@@ -36,7 +36,7 @@ class MonotoneExperimenter(object):
         self.ExperimentsFolder = os.path.join(self.rosPackagePath, "monotone_experiments")
         if not os.path.exists(self.ExperimentsFolder):
             os.makedirs(self.ExperimentsFolder)
-        self.numObjects_options = [7]
+        self.numObjects_options = [6,7,8,9,10,11,12]
         self.numExperiments_perObject = int(args[1])
         self.maxInstancesNeed_perObject = int(args[2])
         self.time_allowed = int(args[3])
@@ -44,39 +44,118 @@ class MonotoneExperimenter(object):
 
     def createNumObjectsFolder(self, num_objects):
         ### create a folder denoted with specified num_objects
-        temp_objectFolder = os.path.join(self.ExperimentsFolder, str(num_objects))
-        if not os.path.exists(temp_objectFolder):
-            os.makedirs(temp_objectFolder)
-        temp_nonMonotoneInstancesFolder = \
-            os.path.join(self.ExperimentsFolder, str(num_objects), "non_monotone_instances")
-        if not os.path.exists(temp_nonMonotoneInstancesFolder):
-            os.makedirs(temp_nonMonotoneInstancesFolder)
+        self.objectFolder = os.path.join(self.ExperimentsFolder, str(num_objects))
+        if not os.path.exists(self.objectFolder):
+            os.makedirs(self.objectFolder)
+        self.nonMonotoneFolder = \
+            os.path.join(self.objectFolder, "non_monotone_instances")
+        if not os.path.exists(self.nonMonotoneFolder):
+            os.makedirs(self.nonMonotoneFolder)
 
     def initializeObjLevelStat(self):
         ### initialize obj-level statistics variable
-        self.DFS_DP_labeled_success_obj = []
-        self.DFS_DP_nonlabeled_success_obj = []
-        self.mRS_labeled_success_obj = []
-        self.mRS_nonlabeled_success_obj = []
-        self.CIRS_success_obj = []
+        self.CIRS_time_obj = []
         self.DFS_DP_labeled_time_obj = []
         self.DFS_DP_nonlabeled_time_obj = []
         self.mRS_labeled_time_obj = []
         self.mRS_nonlabeled_time_obj = []
-        self.CIRS_time_obj = []
+        self.CIRS_success_obj = []
+        self.DFS_DP_labeled_success_obj = []
+        self.DFS_DP_nonlabeled_success_obj = []
+        self.mRS_labeled_success_obj = []
+        self.mRS_nonlabeled_success_obj = []
+        self.CIRS_nActions_obj = []
+        self.DFS_DP_labeled_nActions_obj = []
+        self.DFS_DP_nonlabeled_nActions_obj = []
+        self.mRS_labeled_nActions_obj = []
+        self.mRS_nonlabeled_nActions_obj = []
 
-
-    def saveSolution(self, num_objects, instance_id, solution_time, solution_object_ordering, method_name):
-        temp_instanceFolder = os.path.join(self.ExperimentsFolder, str(num_objects), str(instance_id))
-        solutionFile = temp_instanceFolder + "/" + method_name + ".txt"
-        f_solution = open(solutionFile, "w")
-        ################# write in the solution #####################
-        f_solution.write(str(solution_time) + "\n")
-        for obj_idx in solution_object_ordering:
-            f_solution.write(str(obj_idx) + " ")
-        f_solution.close()
-        #############################################################
-
+    def saveAverageSolutionPerNumObject(self):
+        ################### average time ###################
+        all_methods_average_time_obj = []
+        if len(self.CIRS_time_obj) != 0:
+            average_cirs_time_obj = sum(self.CIRS_time_obj) / len(self.CIRS_time_obj)
+        else:
+            average_cirs_time_obj = 10000
+        all_methods_average_time_obj.append(average_cirs_time_obj)
+        if len(self.DFS_DP_labeled_time_obj) != 0:
+            average_DFS_DP_labeled_time_obj = sum(self.DFS_DP_labeled_time_obj) / len(self.DFS_DP_labeled_time_obj)
+        else:
+            average_DFS_DP_labeled_time_obj = 10000
+        all_methods_average_time_obj.append(average_DFS_DP_labeled_time_obj)
+        if len(self.DFS_DP_nonlabeled_time_obj) != 0:
+            average_DFS_DP_nonlabeled_time_obj = sum(self.DFS_DP_nonlabeled_time_obj) / len(self.DFS_DP_nonlabeled_time_obj)
+        else:
+            average_DFS_DP_nonlabeled_time_obj = 10000
+        all_methods_average_time_obj.append(average_DFS_DP_nonlabeled_time_obj)
+        if len(self.mRS_labeled_time_obj) != 0:
+            average_mRS_labeled_time_obj = sum(self.mRS_labeled_time_obj) / len(self.mRS_labeled_time_obj)
+        else:
+            average_mRS_labeled_time_obj = 10000
+        all_methods_average_time_obj.append(average_mRS_labeled_time_obj)
+        if len(self.mRS_nonlabeled_time_obj) != 0:
+            average_mRS_nonlabeled_time_obj = sum(self.mRS_nonlabeled_time_obj) / len(self.mRS_nonlabeled_time_obj)
+        else:
+            average_mRS_nonlabeled_time_obj = 10000
+        all_methods_average_time_obj.append(average_mRS_nonlabeled_time_obj)
+        ################### average success ###################
+        all_methods_average_success_obj = []
+        if len(self.CIRS_success_obj) != 0:
+            average_cirs_success_obj = sum(self.CIRS_success_obj) / len(self.CIRS_success_obj)
+        else:
+            average_cirs_success_obj = 0.0
+        all_methods_average_success_obj.append(average_cirs_success_obj)
+        if len(self.DFS_DP_labeled_success_obj) != 0:
+            average_DFS_DP_labeled_success_obj = sum(self.DFS_DP_labeled_success_obj) / len(self.DFS_DP_labeled_success_obj)
+        else:
+            average_DFS_DP_labeled_success_obj = 0.0
+        all_methods_average_success_obj.append(average_DFS_DP_labeled_success_obj)
+        if len(self.DFS_DP_nonlabeled_success_obj) != 0:
+            average_DFS_DP_nonlabeled_success_obj = sum(self.DFS_DP_nonlabeled_success_obj) / len(self.DFS_DP_nonlabeled_success_obj)
+        else:
+            average_DFS_DP_nonlabeled_success_obj = 0.0
+        all_methods_average_success_obj.append(average_DFS_DP_nonlabeled_success_obj)
+        if len(self.mRS_labeled_success_obj) != 0:
+            average_mRS_labeled_success_obj = sum(self.mRS_labeled_success_obj) / len(self.mRS_labeled_success_obj)
+        else:
+            average_mRS_labeled_success_obj = 0.0
+        all_methods_average_success_obj.append(average_mRS_labeled_success_obj)
+        if len(self.mRS_nonlabeled_success_obj) != 0:
+            average_mRS_nonlabeled_success_obj = sum(self.mRS_nonlabeled_success_obj) / len(self.mRS_nonlabeled_success_obj)
+        else:
+            average_mRS_nonlabeled_success_obj = 0.0
+        all_methods_average_success_obj.append(average_mRS_nonlabeled_success_obj)
+        ################### average nActions ###################
+        all_methods_average_nActions_obj = []
+        if len(self.CIRS_nActions_obj) != 0:
+            average_cirs_nActions_obj = sum(self.CIRS_nActions_obj) / len(self.CIRS_nActions_obj)
+        else:
+            average_cirs_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_cirs_nActions_obj)
+        if len(self.DFS_DP_labeled_nActions_obj) != 0:
+            average_DFS_DP_labeled_nActions_obj = sum(self.DFS_DP_labeled_nActions_obj) / len(self.DFS_DP_labeled_nActions_obj)
+        else:
+            average_DFS_DP_labeled_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_DFS_DP_labeled_nActions_obj)
+        if len(self.DFS_DP_nonlabeled_nActions_obj) != 0:
+            average_DFS_DP_nonlabeled_nActions_obj = sum(self.DFS_DP_nonlabeled_nActions_obj) / len(self.DFS_DP_nonlabeled_nActions_obj)
+        else:
+            average_DFS_DP_nonlabeled_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_DFS_DP_nonlabeled_nActions_obj)
+        if len(self.mRS_labeled_nActions_obj) != 0:
+            average_mRS_labeled_nActions_obj = sum(self.mRS_labeled_nActions_obj) / len(self.mRS_labeled_nActions_obj)
+        else:
+            average_mRS_labeled_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_mRS_labeled_nActions_obj)
+        if len(self.mRS_nonlabeled_nActions_obj) != 0:
+            average_mRS_nonlabeled_nActions_obj = sum(self.mRS_nonlabeled_nActions_obj) / len(self.mRS_nonlabeled_nActions_obj)
+        else:
+            average_mRS_nonlabeled_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_mRS_nonlabeled_nActions_obj)
+        ### save average results
+        utils2.saveSolution(
+            all_methods_average_time_obj, all_methods_average_success_obj, all_methods_average_nActions_obj, self.objectFolder)
+                
 
     def rosInit(self):
         ### This function specifies the role of a node instance for this class ###
@@ -97,6 +176,9 @@ def main(args):
         num_nonMonotoneInstancesSaved = 0
 
         for experiment_id in range(1, monotone_experimenter.numExperiments_perObject+1):
+            all_methods_time_instance = []
+            all_methods_success_instance = []
+            all_methods_nActions_instance = []
             ### first see if we already have enough instances
             if (num_monotoneInstancesSaved >= monotone_experimenter.maxInstancesNeed_perObject): break
             ### generate an instance in the execution scene
@@ -112,86 +194,170 @@ def main(args):
             ik_generate_success = utils2.serviceCall_generateConfigsForStartPositions("Right_torso")
 
             ########################## now using different methods to solve the instance ##########################
-            ### (v) CIRS
+            ### use CIRS method first just to make sure
+            ### (1) if the instance is monotone, all the methods will be compared
+            ### (2) if the instance is non-monotone, no comparison will be made and the instance will be stored 
+            ### (i) CIRS
             start_time = time.time()
             unidir_cirs_planner = UnidirCIRSPlanner(
                 initial_arrangement, final_arrangement, monotone_experimenter.time_allowed)
             cirs_planning_time = time.time() - start_time
             cirs_isSolved = unidir_cirs_planner.isSolved
+            cirs_nActions = unidir_cirs_planner.best_solution_cost
 
             if not cirs_isSolved:
                 ### the problem is not monotone
                 ### add this instance in the "non_monotone" subfolder
                 num_nonMonotoneInstancesSaved += 1
-                utils2.saveInstance(
-                    num_objects, num_nonMonotoneInstancesSaved, cylinder_objects, monotone_experimenter.ExperimentsFolder)
+                tempInstanceFolder = os.path.join(
+                    monotone_experimenter.nonMonotoneFolder, str(num_nonMonotoneInstancesSaved))
+                utils2.saveInstance(cylinder_objects, tempInstanceFolder)
+                ### Before moving on to the next instance, clear the current instance
+                clear_instance_success = utils2.clearInstance("Right_torso")
+                # input("check the instance clearance!!!")
+                continue
 
-                num_objects, num_monotoneInstancesSaved, cylinder_objects
+            ### otherwise, the problem is monotone and is solved by CIRS
+            monotone_experimenter.CIRS_time_obj.append(cirs_planning_time)
+            monotone_experimenter.CIRS_success_obj.append(float(cirs_isSolved))
+            if cirs_nActions != np.inf:
+                monotone_experimenter.CIRS_nActions_obj.append(cirs_nActions)
+            else:
+                cirs_nActions = 5000
+            all_methods_time_instance.append(cirs_planning_time)
+            all_methods_success_instance.append(float(cirs_isSolved))
+            all_methods_nActions_instance.append(cirs_nActions)
 
+            #####################################################################
+            reset_instance_success = utils2.resetInstance("Right_torso")
+            #####################################################################
 
-            ### (i) DFS_DP_labeled
+            ###### try other methods now ######
+            ### (ii) DFS_DP_labeled
             start_time = time.time()
-            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement)
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(
+                initial_arrangement, final_arrangement, monotone_experimenter.time_allowed)
             DFS_DP_labeled_planning_time = time.time() - start_time
-            isSolved = unidir_dfsdp_planner.isSolved
-            if isSolved:
-                DFS_DP_labeled_object_ordering = unidir_dfsdp_planner.object_ordering
+            DFS_DP_labeled_isSolved = unidir_dfsdp_planner.isSolved
+            DFS_DP_labeled_nActions = unidir_dfsdp_planner.best_solution_cost
+            monotone_experimenter.DFS_DP_labeled_time_obj.append(DFS_DP_labeled_planning_time)
+            monotone_experimenter.DFS_DP_labeled_success_obj.append(float(DFS_DP_labeled_isSolved))
+            if DFS_DP_labeled_nActions != np.inf:
+                monotone_experimenter.DFS_DP_labeled_nActions_obj.append(DFS_DP_labeled_nActions)
+            else:
+                DFS_DP_labeled_nActions = 5000
+            all_methods_time_instance.append(DFS_DP_labeled_planning_time)
+            all_methods_success_instance.append(float(DFS_DP_labeled_isSolved))
+            all_methods_nActions_instance.append(DFS_DP_labeled_nActions)
 
-            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
+            #####################################################################
+            reset_instance_success = utils2.resetInstance("Right_torso")
+            #####################################################################
 
-            ### (ii) DFS_DP_nonlabeled
+            ### (iii) DFS_DP_nonlabeled
             start_time = time.time()
-            unidir_dfsdp_planner = UnidirDFSDPPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
+            unidir_dfsdp_planner = UnidirDFSDPPlanner(
+                initial_arrangement, final_arrangement, monotone_experimenter.time_allowed,
+                isLabeledRoadmapUsed=False)
             DFS_DP_nonlabeled_planning_time = time.time() - start_time
-            isSolved = unidir_dfsdp_planner.isSolved
-            if isSolved:
-                DFS_DP_nonlabeled_object_ordering = unidir_dfsdp_planner.object_ordering
+            DFS_DP_nonlabeled_isSolved = unidir_dfsdp_planner.isSolved
+            DFS_DP_nonlabeled_nActions = unidir_dfsdp_planner.best_solution_cost
+            monotone_experimenter.DFS_DP_nonlabeled_time_obj.append(DFS_DP_nonlabeled_planning_time)
+            monotone_experimenter.DFS_DP_nonlabeled_success_obj.append(float(DFS_DP_nonlabeled_isSolved))
+            if DFS_DP_nonlabeled_nActions != np.inf:
+                monotone_experimenter.DFS_DP_nonlabeled_nActions_obj.append(DFS_DP_nonlabeled_nActions)
+            else:
+                DFS_DP_nonlabeled_nActions = 5000
+            all_methods_time_instance.append(DFS_DP_nonlabeled_planning_time)
+            all_methods_success_instance.append(float(DFS_DP_nonlabeled_isSolved))
+            all_methods_nActions_instance.append(DFS_DP_nonlabeled_nActions)
 
-            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
+            #####################################################################
+            reset_instance_success = utils2.resetInstance("Right_torso")
+            #####################################################################
 
-            ### (iii) mRS_labeled
+            ### (iv) mRS_labeled
             start_time = time.time()
-            unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement)
+            unidir_mrs_planner = UnidirMRSPlanner(
+                initial_arrangement, final_arrangement, monotone_experimenter.time_allowed)
             mRS_labeled_planning_time = time.time() - start_time
-            isSolved = unidir_mrs_planner.isSolved
-            if isSolved:
-                mRS_labeled_object_ordering = unidir_mrs_planner.object_ordering
+            mRS_labeled_isSolved = unidir_mrs_planner.isSolved
+            mRS_labeled_nActions = unidir_mrs_planner.best_solution_cost
+            monotone_experimenter.mRS_labeled_time_obj.append(mRS_labeled_planning_time)
+            monotone_experimenter.mRS_labeled_success_obj.append(float(mRS_labeled_isSolved))
+            if mRS_labeled_nActions != np.inf:
+                monotone_experimenter.mRS_labeled_nActions_obj.append(mRS_labeled_nActions)  
+            else:
+                mRS_labeled_nActions = 5000
+            all_methods_time_instance.append(mRS_labeled_planning_time)
+            all_methods_success_instance.append(float(mRS_labeled_isSolved))
+            all_methods_nActions_instance.append(mRS_labeled_nActions)
             
-            reset_instance_success = monotone_experimenter.resetInstance("Right_torso")
+            #####################################################################
+            reset_instance_success = utils2.resetInstance("Right_torso")
+            #####################################################################
 
-            ### (iv) mRS_nonlabeled
+            ### (v) mRS_nonlabeled
             start_time = time.time()
-            unidir_mrs_planner = UnidirMRSPlanner(initial_arrangement, final_arrangement, isLabeledRoadmapUsed=False)
+            unidir_mrs_planner = UnidirMRSPlanner(
+                initial_arrangement, final_arrangement, monotone_experimenter.time_allowed, 
+                isLabeledRoadmapUsed=False)
             mRS_nonlabeled_planning_time = time.time() - start_time
-            isSolved = unidir_mrs_planner.isSolved
-            if isSolved:
-                mRS_nonlabeled_object_ordering = unidir_mrs_planner.object_ordering
-            #######################################################################################################
+            mRS_nonlabeled_isSolved = unidir_mrs_planner.isSolved
+            mRS_nonlabeled_nActions = unidir_mrs_planner.best_solution_cost
+            monotone_experimenter.mRS_nonlabeled_time_obj.append(mRS_nonlabeled_planning_time)
+            monotone_experimenter.mRS_nonlabeled_success_obj.append(float(mRS_nonlabeled_isSolved))
+            if mRS_nonlabeled_nActions != np.inf:
+                monotone_experimenter.mRS_nonlabeled_nActions_obj.append(mRS_nonlabeled_nActions)
+            else:
+                mRS_nonlabeled_nActions = 5000
+            all_methods_time_instance.append(mRS_nonlabeled_planning_time)
+            all_methods_success_instance.append(float(mRS_nonlabeled_isSolved))
+            all_methods_nActions_instance.append(mRS_nonlabeled_nActions)
 
-            if isSolved:
-                num_monotoneInstancesSaved += 1
-                monotone_experimenter.saveInstance(num_objects, num_monotoneInstancesSaved, cylinder_objects)
-                monotone_experimenter.saveSolution(
-                    num_objects, num_monotoneInstancesSaved, \
-                    DFS_DP_labeled_planning_time, DFS_DP_labeled_object_ordering, "official")
-                print("\n")
-                print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
-                print("Object ordering for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_object_ordering))
-                print("\n")
-                print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
-                print("Object ordering for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_object_ordering))
-                print("\n")
-                print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
-                print("Object ordering for mRS_labeled planning is: {}".format(mRS_labeled_object_ordering))
-                print("\n")
-                print("Time for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_planning_time))
-                print("Object ordering for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_object_ordering))
-                print("\n")
+            #####################################################################
+            reset_instance_success = utils2.resetInstance("Right_torso")
+            #####################################################################
 
-            ## Before moving on to the next instance, clear the current instance
-            clear_instance_success = monotone_experimenter.clearInstance("Right_torso")
-            input("check the instance clearance!!!")
+            #############################################################################################
+            ### this monotone instance has been tested on all methods
+            num_monotoneInstancesSaved += 1
+            tempInstanceFolder = os.path.join(monotone_experimenter.objectFolder, str(num_monotoneInstancesSaved))
+            utils2.saveInstance(cylinder_objects, tempInstanceFolder)
+            utils2.saveSolution(
+                all_methods_time_instance, all_methods_success_instance, all_methods_nActions_instance, tempInstanceFolder)
+            print("\n")
+            print("Time for CIRS planning is: {}".format(cirs_planning_time))
+            print("Success for CIRS planning is: {}".format(cirs_isSolved))
+            print("Number of actions for CIRS planning: {}".format(cirs_nActions))
+            print("\n")
+            print("Time for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_planning_time))
+            print("Success for DFS_DP_labeled_planning is: {}".format(DFS_DP_labeled_isSolved))
+            print("Number of actions for DFS_DP_labeled planning is: {}".format(DFS_DP_labeled_nActions))
+            print("\n")
+            print("Time for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_planning_time))
+            print("Success for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_isSolved))
+            print("Number of actions for DFS_DP_nonlabeled planning is: {}".format(DFS_DP_nonlabeled_nActions))
+            print("\n")
+            print("Time for mRS_labeled planning is: {}".format(mRS_labeled_planning_time))
+            print("Success for mRS_labeled planning is: {}".format(mRS_labeled_isSolved))
+            print("Number of actions for mRS_labeled planning is: {}".format(mRS_labeled_nActions))
+            print("\n")
+            print("Time for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_planning_time))
+            print("Success for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_isSolved))
+            print("Number of actions for mRS_nonlabeled planning is: {}".format(mRS_nonlabeled_nActions))
+            print("\n")
 
+            ### Before moving on to the next instance, clear the current instance
+            clear_instance_success = utils2.clearInstance("Right_torso")
+            # input("check the instance clearance!!!")
+
+        ### reach here as all experiments have been finished for the #objects specified
+        ### we need to save the avarage results for each method for the #objects specified
+        monotone_experimenter.saveAverageSolutionPerNumObject()
+        ### after that, move on to the next parameter for #objects
+
+    ### reach here as you finish all experiments, congrats!
 
     while not rospy.is_shutdown():
         rate.sleep()
