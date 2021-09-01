@@ -11,6 +11,7 @@ import math
 import numpy as np
 import time
 import IPython
+import pickle
 
 import rospy
 import rospkg
@@ -177,6 +178,7 @@ def executeWholePlan(whole_path):
             execute_success (bool): indicate whether success or not
     """
     for path in whole_path:
+        print("rearrange object:" + str(path.object_idx))
         ### first execute the transit trajectory in the path
         execute_success = serviceCall_execute_trajectory(path.transit_trajectory)
         ### now attach the object
@@ -220,6 +222,16 @@ def saveInstance(cylinder_objects, instanceFolder):
         f_instance.write(str(cylinder_object.curr_position.x) + " " + \
             str(cylinder_object.curr_position.y) + " " + str(cylinder_object.curr_position.z) + "\n")
     f_instance.close()
+
+def saveWholePlan(object_paths, instanceFolder):
+    f_path = open(instanceFolder + "/path.obj", 'wb')
+    pickle.dump(object_paths, f_path)
+
+def loadWholePlan(instanceFolder):
+    '''load a plan from the specified folder'''
+    f_path = open(instanceFolder + "/path.obj", 'rb')
+    object_paths = pickle.load(f_path)
+    return object_paths
 
 def saveSolution(all_methods_time, all_methods_success, all_method_nActions, instanceFolder):
     timeFile = instanceFolder + "/time.txt"

@@ -117,6 +117,10 @@ def main(args):
             print("execute solution: " + str(executePath))
             if executePath:
                 utils2.executeWholePlan(object_paths)
+            savePath = True if input("Path Executed. Save the path? (y/n)") == 'y' else False
+            print("save path: " + str(savePath))
+            if savePath:
+                utils2.saveWholePlan(object_paths, example_runner.instanceFolder)
         
         print("exeunt")
 
