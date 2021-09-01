@@ -402,7 +402,7 @@ class Planner(object):
         ### once we get the failure reasons, construct and add invalid states
         for failure_reason in failure_reasons:
             for cstr_obj_idx in failure_reason:
-                invalid_state = {}
+                invalid_state = {} ### do not make it OrderedDict()
                 invalid_state[object_idx] = False
                 for obj_idx in failure_reason:
                     if obj_idx == cstr_obj_idx: continue
@@ -561,12 +561,13 @@ class Planner(object):
         ### Output: isConfigValid (bool) indicating whether the IK is valid
         ###         FLAG (int): indicating the validity/invalidity reason
         ###                     0: no any issues (pass all IK check)
-        #                       1: reachability
-        #                       2: robot self-collision
-        #                       3: collision between robot and static geometry
-        #                       4: collision between robot and objects in the scene
-        #                       5: moving object collides with static geometry
-        #                       6: moving object collides with other objects in the scene
+        ###                     1: reachability
+        ###                     2: robot self-collision
+        ###                     3: collision between robot and known geometries
+        ###                     4: collision between robot and static objects
+        ###                     5: collision between robot and the moving object  
+        ###                     6: the moving object collides with known geometries
+        ###                     7: the moving object collides with static objects
         
         isConfigValid, FLAG = self.checkConfig_reachability(desired_ee_pose, robot, armType)
         if not isConfigValid: 
@@ -667,6 +668,53 @@ class Planner(object):
         #############################################################################################
         ### reaching here since it pass all collision check
         return isConfigValid, FLAG
+
+    def checkConfig_labelCollisions(self, robot, workspace, armType):
+        ######## before calling this function, don't forget to call API: setRobotToConfig ########
+        ### This function checks collisions for FLAG (4,5,6,7) with the prior knowledge
+        ### that FLAG (2,3) has been checked before
+
+        ############ check potentinal collisions with objects not in hand ######################
+        ### first get all the objects which are not in hand
+        static_object_geometries = { obj_info.object_index : obj_info.geo \
+            for obj_info in workspace.object_geometries.values() \
+            if (obj_info.object_index != self.objectInLeftHand_idx) and \
+                (obj_info.object_index != self.objectInRightHand_idx) }
+        ### FLAG: 4
+        isConfigValid, FLAG, objectCollided = \
+            self.checkConfig_CollisionBetweenRobotAndStaticObjects_labeled(robot, static_object_geometries)
+        if isConfigValid == False: return isConfigValid, FLAG, objectCollided
+        #############################################################################################
+
+        ############## then check potential collision arising from moving objects ###################
+        ### first see if there exists moving objects
+        if (self.isObjectInLeftHand and (armType == "Left" or armType == "Left_torso")) or \
+                    (self.isObjectInRightHand and (armType == "Right" or armType == "Right_torso")):
+            ### (i) first update the object in hand
+            self.updateMeshBasedonLocalPose(robot, workspace, armType)
+            if armType == "Left" or armType == "Left_torso":
+                manipulation_objectGEO = self.objectInLeftHand
+            if armType == "Right" or armType == "Right_torso":
+                manipulation_objectGEO = self.objectInRightHand
+            ### (ii) check the potential collision between the robot and the moving object
+            ### FLAG: 5
+            isConfigValid, FLAG = self.checkConfig_CollisionBetweenRobotAndMovingObject(
+                                                        robot, manipulation_objectGEO, armType)
+            if isConfigValid == False: return isConfigValid, FLAG, objectCollided
+            ### (iii) check the potential collision between the moving object and known geometries
+            ### FLAG: 6
+            isConfigValid, FLAG = self.checkConfig_CollisionMovingObjectAndKnownGEO(
+                                                            manipulation_objectGEO, workspace) 
+            if isConfigValid == False: return isConfigValid, FLAG, objectCollided
+            ### (iv) check the potential collision between the moving object and other static objects
+            ### FLAG: 7
+            isConfigValid, FLAG, objectCollided = \
+                self.checkConfig_CollisionMovingObjectAndStaticObjects_labeled(
+                                                manipulation_objectGEO, static_object_geometries)
+            if isConfigValid == False: return isConfigValid, FLAG, objectCollided
+        #############################################################################################
+        ### reaching here since it pass all collision check
+        return isConfigValid, FLAG, objectCollided
 
 
     def checkConfig_CollisionWithRobotAndKnownGEO(self, robot, workspace):

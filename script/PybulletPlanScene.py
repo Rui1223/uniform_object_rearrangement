@@ -192,6 +192,7 @@ class PybulletPlanScene(object):
         all_objects = [i for i in range(len(req.start_arrangement)) \
             if req.start_arrangement[i] != req.target_arrangement[i]]
         for obj_idx in all_objects:
+            print("obj_idx: " + str(obj_idx))
             #################################################################################
             ### get the object's all pre-picking + picking configPoses
             curr_object_configPoses = \
@@ -199,6 +200,8 @@ class PybulletPlanScene(object):
             ### get picking_configPoses_constraints (a list of list of objects) for this object
             picking_configPoses_constraints = self.planner_p.getConstraintsFromLabels(
                 curr_object_configPoses, obj_idx, req.target_arrangement, "picking")
+            print("picking_configPoses_constraints: ")
+            print(picking_configPoses_constraints)
             self.planner_p.addInvalidArrStates(picking_configPoses_constraints, obj_idx)
             ##################################################################################
             ##################################################################################
@@ -208,10 +211,13 @@ class PybulletPlanScene(object):
             ### get placing_configPoses_constraints (a list of list of objects) for this object
             placing_configPoses_constraints = self.planner_p.getConstraintsFromLabels(
                 target_object_configPoses, obj_idx, req.target_arrangement, "placing")
+            print("placing_configPoses_constraints: ")
+            print(placing_configPoses_constraints)
             self.planner_p.addInvalidArrStates(placing_configPoses_constraints, obj_idx)
             ##################################################################################
-        # print("invalid_arr_states_per_obj: ")
-        # print(self.planner_p.invalid_arr_states_per_obj)
+        print("invalid_arr_states_per_obj: ")
+        print(self.planner_p.invalid_arr_states_per_obj)
+        input("Check invalid arr states per object, to get an overall idea why this instance is non-monotone...")
         ### prepare the response
         detect_invalid_arr_states_response = DetectInvalidArrStatesResponse()
         for obj_idx, obj_arr_states in self.planner_p.invalid_arr_states_per_obj.items():
@@ -298,7 +304,7 @@ class PybulletPlanScene(object):
         transit_traj = []
         transfer_traj = []
         finish_traj = []
-        blockPrint()
+        # blockPrint()
 
         curr_object_configPoses = self.planner_p.obtainCurrObjectConfigPoses(self.workspace_p, req.object_idx)
 
@@ -309,9 +315,11 @@ class PybulletPlanScene(object):
             configToPickingPose = curr_object_configPoses.grasping_configs[config_id]
             ############## check the collision of the selected configToPickingPose ##############
             self.planner_p.setRobotToConfig(configToPickingPose, self.robot_p, req.armType)
-            isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
+            # isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
+            isConfigValid, FLAG, objectCollided = self.planner_p.checkConfig_labelCollisions(self.robot_p, self.workspace_p, req.armType)
             if not isConfigValid:
-                print("This picking pose is not even valid. Move on to next candidate.")
+                print("This picking pose is not even valid. FLAG: {}, objectCollided: {}".format(FLAG, objectCollided))
+                print("Move on to next candidate.")
                 continue
             else:
                 ### check the connection with neighbors in the roadmap
@@ -338,9 +346,11 @@ class PybulletPlanScene(object):
                     configToPrePickingPose = curr_object_configPoses.approaching_configs[config_id]
                     ############## check the collision of the selected configToPrePickingPose ##############
                     self.planner_p.setRobotToConfig(configToPrePickingPose, self.robot_p, req.armType)
-                    isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
+                    # isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
+                    isConfigValid, FLAG, objectCollided = self.planner_p.checkConfig_labelCollisions(self.robot_p, self.workspace_p, req.armType)
                     if not isConfigValid:
-                        print("The pre-picking pose is not valid. Move on to next candidate.")
+                        print("This pre-picking pose is not even valid. FLAG: {}, objectCollided: {}".format(FLAG, objectCollided))
+                        print("Move on to next candidate.")
                         continue
                     else:
                         ### check the connection with neighbors in the roadmap
@@ -399,9 +409,11 @@ class PybulletPlanScene(object):
             configToPlacingPose = target_object_configPoses.grasping_configs[config_id]
             ############## check the collision of the selected configToPlacingPose ##############
             self.planner_p.setRobotToConfig(configToPlacingPose, self.robot_p, req.armType)
-            isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
+            # isConfigValid, FLAG = self.planner_p.checkConfig_AllCollisions(self.robot_p, self.workspace_p, req.armType)
+            isConfigValid, FLAG, objectCollided = self.planner_p.checkConfig_labelCollisions(self.robot_p, self.workspace_p, req.armType)
             if not isConfigValid:
-                print("This placing pose is not valid. Move on to next candidate.")
+                print("This placing pose is not even valid. FLAG: {}, objectCollided: {}".format(FLAG, objectCollided))
+                print("Move on to next candidate.")
                 continue
             else:
                 ### check the connection with neighbors in the roadmap
@@ -469,7 +481,7 @@ class PybulletPlanScene(object):
         object_path.finish_trajectory = self.generateArmTrajectory(
                                             finish_traj, req.armType, self.robot_p.motomanRJointNames)
         object_path.object_idx = req.object_idx
-        enablePrint()
+        # enablePrint()
         return True, object_path
         ########################################################################################################
 
