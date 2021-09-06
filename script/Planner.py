@@ -123,11 +123,12 @@ class Planner(object):
         ################ sampling ################
         arms = ["Right_torso"]
         for armType in arms:
-            samplesFile = self.roadmapFolder + "/samples_" + str(armType) + ".txt"
             if mode == "configuration_space":
                 self.samplingNodes_configurationSpace(robot, workspace, armType)
+                samplesFile = self.roadmapFolder + "/samples_" + str(armType) + "_normal.txt"
             if mode == "hybrid_space":
                 self.samplingNodes_hybridSpace(robot, workspace, armType)
+                samplesFile = self.roadmapFolder + "/samples_" + str(armType) + ".txt"
             self.saveSamplesToFile(samplesFile, armType)
         ##########################################
 
@@ -255,7 +256,7 @@ class Planner(object):
     def samplesConnect(self, robot, workspace, armType):
         connectivity = np.zeros((self.nsamples, self.nsamples))
         tree = spatial.KDTree(self.nodes[armType]) ### use KD tree to arrange neighbors assignment
-        connectionsFile = self.roadmapFolder + "/connections_" + str(armType) + ".txt"
+        connectionsFile = self.roadmapFolder + "/connections_" + str(armType) + "_normal.txt"
         f_connection = open(connectionsFile, "w")
         ### for each node
         for node_idx in range(len(self.nodes[armType])):

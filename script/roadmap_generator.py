@@ -24,10 +24,10 @@ def main(args):
     nsamples = int(args[1])
 
     # generate samples
-    # pybullet_plan_scene.planner_p.generateSamples(
-    #     nsamples, pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p)
     pybullet_plan_scene.planner_p.generateSamples(
-        nsamples, pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "hybrid_space")
+        nsamples, pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p)
+    # pybullet_plan_scene.planner_p.generateSamples(
+    #     nsamples, pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "hybrid_space")
     pybullet_plan_scene.planner_p.samplesConnect(
         pybullet_plan_scene.robot_p, pybullet_plan_scene.workspace_p, "Right_torso")
 
