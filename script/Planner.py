@@ -2053,7 +2053,8 @@ class Planner(object):
             candidate.position_idx : candidate.geo for candidate in workspace.candidate_geometries.values()}
         for obj_idx, obj_initial_info in workspace.object_initial_infos.items():
             ### for each object
-            self.object_initial_configPoses[obj_idx] = PositionCandidateConfigs(obj_idx)
+            self.object_initial_configPoses[obj_idx] = PositionCandidateConfigs(
+                                                            workspace.object_initial_infos[obj_idx].position_idx)
             ### first generate graspingPose candidates with different orientations
             graspingPose_candidates = self.generate_pose_candidates(obj_initial_info.pos, workspace.cylinder_height)
             for pose_id, graspingPose in enumerate(graspingPose_candidates):

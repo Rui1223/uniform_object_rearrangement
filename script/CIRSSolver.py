@@ -43,7 +43,7 @@ class CIRSSolver(MonotoneLocalSolver):
     def detectInvalidArrStates(self):
         '''This function detects all invalid states of arrangement
         at which each object is manipulated in the local task'''
-        start_time = time.time()
+        # start_time = time.time()
         ### self.invalid_arr_states_per_obj has the following format
         ### {obj_idx: [{invalid_arr1}, {invalid_arr2}, {invalid_arr3}], ...}
         self.invalid_arr_states_per_obj = {}
@@ -72,8 +72,8 @@ class CIRSSolver(MonotoneLocalSolver):
             ### the problem is solved
             return True
         ### otherwise it's not solved yet. Check if time exceeds
-        # if time.time() - self.local_planning_startTime >= self.time_threshold:
-        #     return False
+        if time.time() - self.local_planning_startTime >= self.time_threshold:
+            return False
 
         FLAG = False
         remaining_objects = [i for i in range(len(current_arrangement)) \
@@ -101,10 +101,10 @@ class CIRSSolver(MonotoneLocalSolver):
             obj_target_position_idx = self.target_arrangement[obj_idx]
             rearrange_success, transition_path = self.serviceCall_rearrangeCylinderObject(
                 obj_idx, obj_target_position_idx, "Right_torso", isLabeledRoadmapUsed=self.isLabeledRoadmapUsed)
-            print("\n====================")
-            print("rearranging_success: ", rearrange_success)
-            input("enter to continue")
-            print("====================\n")
+            # print("\n====================")
+            # print("rearranging_success: ", rearrange_success)
+            # input("enter to continue")
+            # print("====================\n")
             if rearrange_success:
                 self.generateLocalNode(current_node_id, obj_idx, transition_path)
                 ### recursive call
@@ -113,8 +113,8 @@ class CIRSSolver(MonotoneLocalSolver):
                     return FLAG
                 else:
                     ### first check if FLAG == False is due to timeout, if it is, just return
-                    # if time.time() - self.local_planning_startTime >= self.time_threshold:
-                    #     return FLAG
+                    if time.time() - self.local_planning_startTime >= self.time_threshold:
+                        return FLAG
                     ### put the object and robot back to the configuration they belong to
                     ### at the beginning of the function call
                     self.revertBackToParentNode(current_node_id, obj_idx, obj_curr_position_idx, "Right_torso")

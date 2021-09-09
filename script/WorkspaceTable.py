@@ -10,7 +10,7 @@ import math
 import numpy as np
 import time
 import IPython
-from random import uniform, random
+import random
 
 from CollisionChecker import CollisionChecker
 import utils
@@ -198,9 +198,9 @@ class WorkspaceTable(object):
                 print("generate the {}th object".format(obj_i))
                 timeout -= 1
                 start_pos = [
-                    round(uniform(self.constrained_area_x_limit[0] + self.cylinder_radius, \
+                    round(random.uniform(self.constrained_area_x_limit[0] + self.cylinder_radius, \
                             self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius), 3),
-                    round(uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
+                    round(random.uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
                             self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius), 3),
                     round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)
                 ]
@@ -513,6 +513,54 @@ class WorkspaceTable(object):
         ### (1) deletes all object meshes in the workspace
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
+
+    def set_scene_for_objects(self, arrangement):
+        ### put the object at the position specified by the arrangement
+        for obj_idx in range(len(arrangement)):
+            position_idx = arrangement[obj_idx]
+            if position_idx >= self.num_candidates:
+                ### put the object back to its initial position
+                p.resetBasePositionAndOrientation(self.object_geometries[obj_idx].geo, 
+                    self.object_initial_infos[obj_idx].pos, [0, 0, 0, 1.0], physicsClientId=self.server)
+                self.object_geometries[obj_idx].setCurrPosition(position_idx, 
+                    self.object_initial_infos[obj_idx].collision_position_idx, self.object_initial_infos[obj_idx].pos)
+            else:
+                ### put the object back to a candidate position
+                p.resetBasePositionAndOrientation(self.object_geometries[obj_idx].geo, 
+                    self.candidate_geometries[position_idx].pos, [0, 0, 0, 1.0], physicsClientId=self.server)
+                self.object_geometries[obj_idx].setCurrPosition(position_idx, position_idx, self.candidate_geometries[position_idx].pos)
+        # print("=================================")
+        # for obj_idx, obj_info in self.object_geometries.items():
+        #     print(obj_idx)
+        #     print(obj_info.curr_pos)
+        #     print(obj_info.curr_position_idx)
+        #     print(obj_info.collision_position_idx)
+        #     print("\n")
+
+    def selectNoCollisionBuffer(self, object_idx, target_position_idx):
+        ### this function selects a buffer to put a specified object without collision
+        max_trials = 3
+        current_trials = 1
+        buffer_select_success = False
+        other_object_curr_geometries =[obj_info.geo for obj_info in self.object_geometries.values() if obj_info.object_index != object_idx]
+        while (current_trials <= max_trials) and (buffer_select_success == False):
+            buffer_idx = random.choice(range(self.num_candidates))
+            while buffer_idx == self.object_geometries[object_idx].curr_position_idx or buffer_idx == target_position_idx:
+                ### the buffer is selected as the chosen object's current position or its target position
+                buffer_idx = random.choice(range(self.num_candidates))
+            ### now make sure the selected buffer has safe distance with other existing objects
+            isCollision = self.collisionAgent.collisionCheck_instance_cylinder_objects(
+                self.candidate_geometries[buffer_idx].geo, other_object_curr_geometries, self.cylinder_radius)
+            if not isCollision:
+                buffer_select_success = True
+                break
+            else:
+                current_trials += 1
+        ### reach here either success or not
+        return buffer_select_success, buffer_idx
+
+
+
 
 
 ### general class of object in the workspace

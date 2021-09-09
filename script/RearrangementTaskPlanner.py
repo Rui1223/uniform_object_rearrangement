@@ -18,6 +18,8 @@ from uniform_object_rearrangement.srv import GetCurrRobotConfig, GetCurrRobotCon
 from uniform_object_rearrangement.srv import UpdateCertainObjectPose, UpdateCertainObjectPoseRequest
 from uniform_object_rearrangement.srv import ResetRobotCurrConfig, ResetRobotCurrConfigRequest
 from uniform_object_rearrangement.srv import UpdateManipulationStatus, UpdateManipulationStatusRequest
+from uniform_object_rearrangement.srv import SetSceneBasedOnArrangement, SetSceneBasedOnArrangementRequest
+from uniform_object_rearrangement.srv import SelectObjectAndBuffer, SelectObjectAndBufferRequest
 
 
 # Disable
@@ -157,6 +159,38 @@ class RearrangementTaskPlanner(object):
             return updateManipulationStatus_response.success
         except rospy.ServiceException as e:
             print("update_manipulation_status service call failed: %s" % e)
+
+    def serviceCall_setSceneBasedOnArrangementNode(self, arrangement, robotConfig, armType):
+        '''call the SetSceneBasedOnArrangement service to
+           set scene based on arrangement node'''
+        rospy.wait_for_service("set_scene_based_on_arrangement")
+        request = SetSceneBasedOnArrangementRequest()
+        request.arrangement = arrangement
+        request.robot_config.position = robotConfig
+        request.armType = armType
+        try:
+            setSceneBasedOnArrangement_proxy = rospy.ServiceProxy("set_scene_based_on_arrangement", SetSceneBasedOnArrangement)
+            setSceneBasedOnArrangement_response = setSceneBasedOnArrangement_proxy(request)
+            return setSceneBasedOnArrangement_response.success
+        except rospy.ServiceException as e:
+            print("set_scene_based_on_arrangement service call failed: %s" % e)
+
+    def serviceCall_selectObjectAndBuffer(self, objects_to_move, final_arrangement, armType, isLabeledRoadmapUsed):
+        '''call the SelectObjectAndBuffer service to
+           select object and buffer'''
+        rospy.wait_for_service("select_object_and_buffer")
+        request = SelectObjectAndBufferRequest()
+        request.objects_to_move = objects_to_move
+        request.final_arrangement = final_arrangement
+        request.armType = armType
+        request.isLabeledRoadmapUsed = isLabeledRoadmapUsed
+        try:
+            selectObjectAndBuffer_proxy = rospy.ServiceProxy("select_object_and_buffer", SelectObjectAndBuffer)
+            selectObjectAndBuffer_response = selectObjectAndBuffer_proxy(request)
+            return selectObjectAndBuffer_response.success, selectObjectAndBuffer_response.object_idx, \
+                selectObjectAndBuffer_response.buffer_idx, selectObjectAndBuffer_response.path
+        except rospy.ServiceException as e:
+            print("select_object_and_buffer service call failed: %s" % e)
 
 
 
