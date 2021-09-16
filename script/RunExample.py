@@ -14,8 +14,6 @@ import rospkg
 from UnidirMRSPlanner import UnidirMRSPlanner
 from UnidirDFSDPPlanner import UnidirDFSDPPlanner
 from UnidirCIRSPlanner import UnidirCIRSPlanner
-from UnidirCIRSHeuristicPlanner import UnidirCIRSHeuristicPlanner
-from UnidirDFSDPHeuristicPlanner import UnidirDFSDPHeuristicPlanner
 
 ############################### description #########################################
 ### This class defines a ExampleRunner class which
@@ -67,16 +65,6 @@ def main(args):
         ik_generate_success = utils2.serviceCall_generateConfigsForStartPositions("Right_torso")
 
         ###### run an example given the method specified ######
-        ### (0) CIRS_h1
-        if example_runner.method_name == "CIRS_h1":
-            start_time = time.time()
-            the_chosen_planner = UnidirCIRSHeuristicPlanner(
-                initial_arrangement, final_arrangement, example_runner.time_allowed)
-        ### (1) DFS_DP_h1
-        if example_runner.method_name == "DFS_DP_h1":
-            start_time = time.time()
-            the_chosen_planner = UnidirDFSDPHeuristicPlanner(
-                initial_arrangement, final_arrangement, example_runner.time_allowed)
         ### (i) CIRS
         if example_runner.method_name == "CIRS":
             start_time = time.time()
