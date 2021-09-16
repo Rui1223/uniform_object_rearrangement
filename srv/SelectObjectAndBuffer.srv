@@ -5,6 +5,7 @@
 int32[] objects_to_move
 int32[] final_arrangement
 string armType
+int32 heuristic_level
 bool isLabeledRoadmapUsed
 ---
 bool success

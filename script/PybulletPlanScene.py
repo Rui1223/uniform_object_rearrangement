@@ -79,8 +79,8 @@ class PybulletPlanScene(object):
         self.rosPackagePath = rospack.get_path("uniform_object_rearrangement")
 	
         ### set the server for the pybullet plan scene
-        # self.planningClientID = p.connect(p.DIRECT)
-        self.planningClientID = p.connect(p.GUI)
+        self.planningClientID = p.connect(p.DIRECT)
+        # self.planningClientID = p.connect(p.GUI)
         # p.setAdditionalSearchPath(pybullet_data.getDataPath())
         # self.egl_plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
         # print("plugin=", self.egl_plugin)
@@ -300,7 +300,11 @@ class PybulletPlanScene(object):
     def select_object_and_buffer_callback(self, req):
         ############################## first select an object ##############################
         object_path = ObjectRearrangePath()
-        object_idx = random.choice(list(req.objects_to_move))
+        if req.heuristic_level == 0:
+            object_idx = random.choice(list(req.objects_to_move))
+        if req.heuristic_level == 1:
+            object_ranking = self.workspace_p.getObjectConstraintRanking(req.objects_to_move, req.final_arrangement)
+            object_idx = object_ranking[0]
         ### Once select the object, check if it can be reached based on current arrangement
         transit_success, transit_traj, pickingPose_neighbors_idx, pickingPose_neighbors_cost = \
                                                     self.transit_cylinder_object(object_idx, req)

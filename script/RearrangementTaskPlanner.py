@@ -175,7 +175,7 @@ class RearrangementTaskPlanner(object):
         except rospy.ServiceException as e:
             print("set_scene_based_on_arrangement service call failed: %s" % e)
 
-    def serviceCall_selectObjectAndBuffer(self, objects_to_move, final_arrangement, armType, isLabeledRoadmapUsed):
+    def serviceCall_selectObjectAndBuffer(self, objects_to_move, final_arrangement, armType, heuristic_level, isLabeledRoadmapUsed):
         '''call the SelectObjectAndBuffer service to
            select object and buffer'''
         rospy.wait_for_service("select_object_and_buffer")
@@ -183,6 +183,7 @@ class RearrangementTaskPlanner(object):
         request.objects_to_move = objects_to_move
         request.final_arrangement = final_arrangement
         request.armType = armType
+        request.heuristic_level = heuristic_level
         request.isLabeledRoadmapUsed = isLabeledRoadmapUsed
         try:
             selectObjectAndBuffer_proxy = rospy.ServiceProxy("select_object_and_buffer", SelectObjectAndBuffer)

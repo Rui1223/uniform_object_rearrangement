@@ -23,11 +23,16 @@ from the roadmap built in robotic scenarios.*/
 //     // printEdgeCosts();
 // }
 
-void Graph_t::constructGraph(std::string samples_file, std::string connections_file)
+void Graph_t::constructGraph(std::string samples_file, std::string connections_file, bool isLabeled)
 {
     // m_nNodes = nsamples;
     specify_nodeStates(samples_file);
-    specify_neighborCostsAndLabels(connections_file);
+    if (isLabeled == true) {
+        specify_neighborCostsAndLabels(connections_file);
+    }
+    else {
+        specify_neighborCosts(connections_file);
+    }
     specify_edgeStatus();
     // printStates();
     // printNeighbors();

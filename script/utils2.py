@@ -249,3 +249,10 @@ def saveSolution(all_methods_time, all_methods_success, all_method_nActions, ins
     for method_nActions in all_method_nActions:
         f_actions.write(str(method_nActions) + "\n")
     f_actions.close()
+
+def saveOrderingInfo(object_ordering, instanceFolder):
+    orderingFile = instanceFolder + "/ordering.txt"
+    f_ordering = open(orderingFile, "w")
+    for obj_idx in object_ordering:
+        f_ordering.write(str(obj_idx) + " ")
+    f_ordering.close()

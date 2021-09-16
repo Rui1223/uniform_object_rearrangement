@@ -559,6 +559,40 @@ class WorkspaceTable(object):
         ### reach here either success or not
         return buffer_select_success, buffer_idx
 
+    def getObjectConstraintRanking(self, objects_to_move, final_arrangement):
+        ### this functions ranks the objects in the objects_to_move
+        ### giving the reasoning about the their constraints
+        ### i.e., how constraining and constrained they are
+        object_constraints_degrees = {}
+        for obj_idx in objects_to_move:
+            ### (0) constraining (inner degree) (1) constrained (outer degree)
+            object_constraints_degrees[obj_idx] = [0, 0]
+        ### Now check the constraint for the current geometry of the object
+        for obj_idx in objects_to_move:
+            geo = self.object_geometries[obj_idx].geo
+            other_object_geometries = {}
+            for other_obj_idx in objects_to_move:
+                if other_obj_idx == obj_idx: continue
+                other_object_geometries[other_obj_idx] = self.candidate_geometries[final_arrangement[other_obj_idx]].geo
+                # other_object_geometries[other_obj_idx] = self.candidate_geometries[self.object_geometries[other_obj_idx].goal_position_idx].geo
+            object_goals_to_collide = self.collisionAgent.collisionCheck_objectAndObjects(geo, other_object_geometries)
+            for object_to_collide in object_goals_to_collide:
+                ### constraint: object_to_collide --> obj_idx
+                object_constraints_degrees[obj_idx][0] += 1
+                object_constraints_degrees[object_to_collide][1] += 1
+
+        object_degrees = {}
+        for obj_idx, degrees in object_constraints_degrees.items():
+            object_degrees[obj_idx] = degrees[0] + degrees[1]
+
+        object_ranking = sorted(object_degrees, key=lambda k : object_degrees[k], reverse=True)
+        return object_ranking
+        
+
+        
+
+
+
 
 
 

@@ -23,13 +23,15 @@ class Planner_t {
 public:
 
     Graph_t m_right_torso_g;
+    Graph_t m_right_torso_normal_g;
     AstarSolver_t m_astar_solver;
 
     // constructor
     Planner_t() {}
-    Planner_t(std::string right_torso_samples_file, std::string right_torso_connections_file) 
+    Planner_t(std::string samples_file, std::string connections_file, std::string samples_normal_file, std::string connections_normal_file) 
     {
-        m_right_torso_g.constructGraph(right_torso_samples_file, right_torso_connections_file);
+        m_right_torso_g.constructGraph(samples_file, connections_file, true);
+        m_right_torso_normal_g.constructGraph(samples_normal_file, connections_normal_file, false);
     }
 
     bool astarSolverNonLabeledCallback(
@@ -39,15 +41,15 @@ public:
         if (req.armType == "Right_torso"){
             if (m_astar_solver.getQueryIdx() != req.query_idx) {
                 // this is a new query, let's set the new query
-                m_astar_solver.setPlanningQuery_nonLabeled(m_right_torso_g, req.query_idx, 
+                m_astar_solver.setPlanningQuery_nonLabeled(m_right_torso_normal_g, req.query_idx, 
                     req.start_idx, req.goal_idx, req.start_config, req.goal_config,
                     req.start_neighbors_idx, req.goal_neighbors_idx,
                     req.start_neighbors_cost, req.goal_neighbors_cost,
                     req.violated_edges);
             }
-            m_right_torso_g.modifyEdge(req.violated_edges, req.query_idx);
-            m_astar_solver.prepareToSearch(m_right_torso_g);
-            m_astar_solver.Astar_search_nonLabeled(m_right_torso_g);
+            m_right_torso_normal_g.modifyEdge(req.violated_edges, req.query_idx);
+            m_astar_solver.prepareToSearch(m_right_torso_normal_g);
+            m_astar_solver.Astar_search_nonLabeled(m_right_torso_normal_g);
         }
         // let's return the response after a search
         resp.searchSuccess = m_astar_solver.getSearchSuccessInfo();
@@ -85,6 +87,7 @@ public:
     {
         if (req.armType == "Right_torso") {
             m_right_torso_g.resetEdgeStatus();
+            m_right_torso_normal_g.resetEdgeStatus();
         }
         resp.success = true;
         return true;
@@ -106,10 +109,13 @@ int main(int argc, char** argv)
     // load the roadmap for left and right arm
     std::string right_torso_samples_file = package_path + "/roadmaps/samples_Right_torso.txt";
     std::string right_torso_connections_file = package_path + "/roadmaps/connections_Right_torso.txt";
-    Planner_t planner(right_torso_samples_file, right_torso_connections_file);
+    std::string right_torso_samples_normal_file = package_path + "/roadmaps/samples_Right_torso_normal.txt";
+    std::string right_torso_connections_normal_file = package_path + "/roadmaps/connections_Right_torso_normal.txt";
+    Planner_t planner(
+        right_torso_samples_file, right_torso_connections_file, right_torso_samples_normal_file, right_torso_connections_normal_file);
 
     // planner.printWrapper();
-    std::cout << "time to load graph with " << planner.m_right_torso_g.getnNodes() << " nodes is " << t.elapsed() << "\n";
+    std::cout << "time to load graph with " << planner.m_right_torso_g.getnNodes() << " nodes for two graphs is " << t.elapsed() << "\n";
 
     // claim service the node provide (server)
     ros::ServiceServer astar_nonlabeled_server = nh.advertiseService("astar_path_finding_nonlabeled", &Planner_t::astarSolverNonLabeledCallback, &planner);

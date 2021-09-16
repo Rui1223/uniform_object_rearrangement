@@ -32,6 +32,7 @@ class UnidirDFSDPPlanner(RearrangementTaskPlanner):
         RearrangementTaskPlanner.__init__(
             self, initial_arrangement, final_arrangement, time_allowed, isLabeledRoadmapUsed)
         rospy.logwarn("initialize an unidirectional DFSDP planner")
+        self.heuristic_level = 0
 
         remaining_time_allowed = self.time_threshold - (time.time() - self.planning_startTime)
         self.growSubTree(self.treeL["L0"], self.final_arrangement, remaining_time_allowed, self.isLabeledRoadmapUsed)
@@ -62,7 +63,7 @@ class UnidirDFSDPPlanner(RearrangementTaskPlanner):
         objects_yet_to_move = [
             i for i in range(len(self.final_arrangement)) if temp_node.arrangement[i] != self.final_arrangement[i]]
         success, object_idx, buffer_idx, object_path = self.serviceCall_selectObjectAndBuffer(
-                            objects_yet_to_move, self.final_arrangement, "Right_torso", self.isLabeledRoadmapUsed)
+                            objects_yet_to_move, self.final_arrangement, "Right_torso", self.heuristic_level, self.isLabeledRoadmapUsed)
         if success == False:
             ### the perturbation process fails either due to failure to select an object or the failure to select a buffer
             return False, None

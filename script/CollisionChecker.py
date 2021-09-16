@@ -18,6 +18,18 @@ class CollisionChecker(object):
                 break
         return isCollision
 
+    def collisionCheck_objectAndObjects(self, objectGEO, object_geometries):
+        ### here geometries is a dictionary (obj_idx: geo)
+        ### loop through all objects in object_geometries
+        objects_to_collide = []
+        for obj_idx, object_geo in object_geometries.items():
+            contacts = p.getClosestPoints(
+                bodyA=objectGEO, bodyB=object_geo, distance=0.003, physicsClientId=self.server)
+            if len(contacts) != 0:
+                objects_to_collide.append(obj_idx)
+        return objects_to_collide
+
+
     def collisionCheck_selfCollision(self, robotGEO):
         isCollision = False
         # contacts = p.getClosestPoints(bodyA=robotGEO, bodyB=robotGEO, distance=0.0, physicsClientId=self.server)
@@ -166,7 +178,7 @@ class CollisionChecker(object):
 
     def collisionCheck_object_objectGEO(self, objectGEO, object_geometries):
         isCollision = False
-        ### loop through all object in objectGEOs
+        ### loop through all objects in object_geometries
         for obj_idx, object_geo in object_geometries.items():
             contacts = p.getClosestPoints(
                 bodyA=objectGEO, bodyB=object_geo, distance=0.003, physicsClientId=self.server)
