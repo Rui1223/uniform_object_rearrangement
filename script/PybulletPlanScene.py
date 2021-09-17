@@ -41,6 +41,7 @@ from uniform_object_rearrangement.srv import SetSceneBasedOnArrangement, SetScen
 from uniform_object_rearrangement.srv import SelectObjectAndBuffer, SelectObjectAndBufferResponse
 from uniform_object_rearrangement.srv import ResetPlanningInstance, ResetPlanningInstanceResponse
 from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceResponse
+from uniform_object_rearrangement.srv import ResetRobotHome, ResetRobotHomeResponse
 
 ################################## description #####################################
 ### This class defines a PybulletPlanScene class which
@@ -173,6 +174,10 @@ class PybulletPlanScene(object):
         self.clear_planning_instance_server = rospy.Service(
             "clear_planning_instance", ClearPlanningInstance,
             self.clear_planning_instance_callback)
+
+        self.reset_robot_home_server = rospy.Service(
+            "reset_robot_home", ResetRobotHome,
+            self.reset_robot_home_callback)
 
         rospy.init_node("pybullet_plan_scene", anonymous=True)
 
@@ -387,6 +392,45 @@ class PybulletPlanScene(object):
         ### (iii) reset the robot back to the home configuration
         self.robot_p.resetRobotToHomeConfiguration()
         return ClearPlanningInstanceResponse(True)
+
+    def reset_robot_home_callback(self, req):
+        resetHome_trajectory = ArmTrajectory()
+        ### reset the robot to home configuration
+        ######################## check currConfig's neighboring connectivity ########################
+        currConfig = self.robot_p.getRobotCurrSingleArmConfig(req.armType)
+        connectSuccess, currConfig_neighbors_idx, currConfig_neighbors_cost = self.planner_p.connectToNeighbors(
+                                    currConfig, self.robot_p, self.workspace_p, req.armType)
+        if not connectSuccess:
+            print("There exists connection problem for current config. Not be able to reset the robot home")
+            return ResetRobotHomeResponse(False, resetHome_trajectory)
+        ##############################################################################################
+
+        ######################## check homeConfig's neighboring connectivity ########################
+        if req.armType == "Right_torso":
+            homeConfig = [self.robot_p.torsoHomeConfiguration] + self.robot_p.rightArmHomeConfiguration
+        connectSuccess, homeConfig_neighbors_idx, homeConfig_neighbors_cost = self.planner_p.connectToNeighbors(
+                                    homeConfig, self.robot_p, self.workspace_p, req.armType)
+        if not connectSuccess:
+            print("home config has problem of connecting to neighbors, which should not happen. Not be able to reset the robot home")
+            return ResetRobotHomeResponse(False, resetHome_trajectory)
+        ##############################################################################################
+
+        ####################### motion planning from currConfig to homeConfig ########################
+        resetHome_traj = self.planner_p.AstarPathFinding(currConfig, homeConfig,
+                        currConfig_neighbors_idx, currConfig_neighbors_cost, 
+                        homeConfig_neighbors_idx, homeConfig_neighbors_cost,
+                        self.robot_p, self.workspace_p, req.armType, req.isLabeledRoadmapUsed)
+        if resetHome_traj != []:
+            print("The reset_home path for %s arm is successfully found" % req.armType)
+            ### generate ArmTrajectory from resetHome_traj
+            resetHome_trajectory = self.generateArmTrajectory(resetHome_traj, req.armType, self.robot_p.motomanRJointNames)
+            return ResetRobotHomeResponse(True, resetHome_trajectory)
+        else:
+            print("The reset_home path for %s arm is not successfully found" % req.armType)
+            print("Not be able to reset the robot home")
+            return ResetRobotHomeResponse(False, resetHome_trajectory)
+        ##############################################################################################
+        
 
     def rearrange_cylinder_object_callback(self, req):
         rearrange_success, object_manipulation_path = self.rearrange_cylinder_object(req)

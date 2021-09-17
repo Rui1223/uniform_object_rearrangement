@@ -111,6 +111,14 @@ def main(args):
         print("Number of actions for {} planning is: {}".format(example_runner.method_name, nActions))
         print("Object ordering for {} planning is: {}".format(example_runner.method_name, object_ordering))
 
+        ### move the robot back to home configuration (optional)
+        if (example_runner.method_name == "CIRS") or (example_runner.method_name == "DFSDP") \
+            or (example_runner.method_name == "mRS"):
+            resetHome_success, resetHome_trajectory = utils2.serviceCall_reset_robot_home("Right_torso")
+        if (example_runner.method_name == "CIRS_nonlabeled") or (example_runner.method_name == "DFSDP_nonlabeled") \
+            or (example_runner.method_name == "mRS_nonlabeled"):
+            resetHome_success, resetHome_trajectory = utils2.serviceCall_reset_robot_home("Right_torso", False)
+
         if example_runner.isNewInstance:
             ### only keep the option to save instance when it is a new instance
             saveInstance = True if input("save instance? (y/n)") == 'y' else False
@@ -122,11 +130,17 @@ def main(args):
             executePath = True if input("Solution found. Execute the solution? (y/n)") == 'y' else False
             print("execute solution: " + str(executePath))
             if executePath:
-                utils2.executeWholePlan(object_paths)
+                if resetHome_success:
+                    utils2.executeWholePlan(object_paths, resetHome_trajectory)
+                else:
+                    utils2.executeWholePlan(object_paths)
             savePath = True if input("Path Executed. Save the path? (y/n)") == 'y' else False
             print("save path: " + str(savePath))
             if savePath:
-                utils2.saveWholePlan(object_paths, example_runner.instanceFolder)
+                if resetHome_success:
+                    utils2.saveWholePlan(object_paths, example_runner.instanceFolder, resetHome_trajectory)
+                else:
+                    utils2.saveWholePlan(object_paths, example_runner.instanceFolder)
             saveOrderingInfo = True if input("Save the ordering for future reference? (y/n)") == 'y' else False
             print("save ordering info: " + str(saveOrderingInfo))
             if saveOrderingInfo:
