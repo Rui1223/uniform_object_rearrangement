@@ -28,7 +28,7 @@ Once the `catkin_make` is successful, to try an example on any existing method, 
 `roslaunch uniform_object_rearrangement run_example.launch run_example:="<#object> <instance id> <generate or load an instance> <time allowed> <method name>"` <br/>
 Here the placedholders in <> are </br>
 - <#object>: the number of object you want to try (options 6-12)
-- <instance_id>: which instance do you want to try (an integer)
+- <instance id>: which instance do you want to try (an integer)
 - <generate or load an instance>: 'g': indicates generating a new instance; 'l': indicates loading an existing instance
 - <time allowed>: the time allowed for the method to solve the instance/problem (time suggestion: 180 or 360 seconds)
 - <method name>: indicates the name of the method you want to try (options: CIRS, CIRS_nonlabeled, DFSDP, DFSDP_nonlabeled, mRS, mRS_nonlabeled). CIRS is the best method and is recommended.
