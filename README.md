@@ -20,8 +20,15 @@ pickle <br/>
 It could be difficult to exhaustively list all potential dependencies. Should you have any difficulties trying the software, do not hesitate to contact wrui1223@gmail.com for further help.
 
 ### Instruction
-Once you download the repository, you need to create a ROS workspace where this repository fits in as a ROS package. Instructions on how to create a ROS workspace can be found [here](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). After you create a workspace, say you name the workspace as `catkin_ws`, go to the directory of the workspace and build code in the catkin workspace with
-`catkin_make`
-It may throw out some minor errors and if this is the case, repeat the `catkin_make` two or three more times should work. (At least it works in my case. Again, feel free to contact wrui1223@gmail.com for further help.)
+Once you download the repository, you need to create a ROS workspace where this repository fits in as a ROS package. Instructions on how to create a ROS workspace can be found [here](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). 
+After you create a workspace, say you name the workspace as `catkin_ws`, go to the directory of the workspace and build code in the catkin workspace by running <br/>
+`catkin_make` <br/>
+It may throw out some minor errors and if this is the case, repeat the `catkin_make` two or three more times should work. (At least it works in my case. Again, feel free to contact wrui1223@gmail.com for further help.) <br/>
 Once the `catkin_make` is successful, to try an example on any existing method, run the following
 `roslaunch uniform_object_rearrangement run_example.launch run_example:="<#object> <instance id> <generate or load an instance> <time allowed> <method name>"`
+Here the placedholders in <> are
+- <#object>: the number of object you want to try (options 6-12)
+- <instance_id>: which instance do you want to try (an integer)
+- <generate or load an instance>: 'g': indicates generating a new instance; 'l': indicates loading an existing instance
+- <time allowed>: the time allowed for the method to solve the instance/problem (time suggestion: 180 or 360 seconds)
+- <method name>: indicates the name of the method you want to try (options: CIRS, CIRS_nonlabeled, DFSDP, DFSDP_nonlabeled, mRS, mRS_nonlabeled). CIRS is the best method and is recommended.
