@@ -32,7 +32,8 @@ Here the placedholders in <> are </br>
 - **<instance_id>**: which instance do you want to try (an integer)
 - **<generate/load an instance>**: 'g': indicates generating a new instance; 'l': indicates loading an existing instance
 - **<time_allowed>**: the time allowed for the method to solve the instance/problem (time suggestion: 180 or 360 seconds)
-- **<method_name>**: indicates the name of the method you want to try (options: CIRS, CIRS_nonlabeled, DFSDP, DFSDP_nonlabeled, mRS, mRS_nonlabeled). CIRS is the best method and is recommended. <br/>
+- **<method_name>**: indicates the name of the method you want to try (options: CIRS, CIRS_nonlabeled, DFSDP, DFSDP_nonlabeled, mRS, mRS_nonlabeled). CIRS is the best method and is recommended.
+
 In summary, if you run <br/>
 `roslaunch uniform_object_rearrangement run_example.launch run_example:="6 1 l 180 CIRS"` <br/>
 It means you are loading an existing example in the folder "examples/6/1" (1st instance in the 6-object scenario) and use CIRS as the method to solve it given a limitation of 180 seconds.
@@ -40,3 +41,20 @@ It means you are loading an existing example in the folder "examples/6/1" (1st i
 On the other side, if you run
 `roslaunch uniform_object_rearrangement run_example.launch run_example:="8 3 g 180 CIRS"` <br/>
 You are generating a new example as the 3rd instance in the 8-object scenario and use CIRS as the method to solve it given a limitation of 180 seconds.
+
+It will launch two interfaces (1) for an execution scene, which describes the real scene where the objects and the robot reside, and (2) for a planning scene, which describes how the robot thinks of the enviroment and use it for planning. You will see the robot working in the planning scene to search for a solution given the instance.
+
+- If a solution is found, the message on the terminal first asks you if you want to save the instance (y/n). If you type 'y', the instance is saved in the corresponding example folder with a "instance_info.txt" containing the example information. This message only pops out if you are generating a new instance.
+- Then it asks if you want to execute the solution (y/n). If you type 'y', the solution (a sequence of manipulation paths) will be executed in the execution scene. 
+- After the execution, it will ask if you want to save the solution path (y/n). If you type 'y', a file named "path.obj" will be saved in the same instance folder.
+- At the end, it will ask if you want to save the object ordering for future reference. If you type 'y', a flie named "ordering.txt" will be saved in the same instance folder containing the ordering with which objects are rearranged so as to solve the problem.
+
+You can also run the following
+`roslaunch uniform_object_rearrangement execute_task_plan.launch execute_task_plan:="<#object> <instance_id>"` <br/>
+to just execute a solution path you have saved before. 
+
+For instance, if you run
+`roslaunch uniform_object_rearrangement execute_task_plan.launch execute_task_plan:="6 1"` <br/>
+then the solution path in "examples/6/1/path.obj" will be executed in the execution scene.
+
+Should you have any questions, feel free to contact wrui1223@gmail.com for references.
