@@ -25,7 +25,7 @@ After you create a workspace, say you name the workspace as `catkin_ws`, go to t
 `catkin_make` <br/>
 It may throw out some minor errors and if this is the case, repeat the `catkin_make` two or three more times should work. (At least it works in my case. Again, feel free to contact wrui1223@gmail.com for further help.) <br/>
 Once the `catkin_make` is successful, to try an example on any existing method, run the following <br/>
-`roslaunch uniform_object_rearrangement run_example.launch run_example:="<#object> <instance id> <generate or load an instance> <time allowed> <method name>"` <br/>
+`roslaunch uniform_object_rearrangement run_example.launch run_example:="<#object> <instance_id> <generate/load an instance> <time_allowed> <method_name>"` <br/>
 Here the placedholders in <> are </br>
 - <#object>: the number of object you want to try (options 6-12)
 - <instance id>: which instance do you want to try (an integer)
