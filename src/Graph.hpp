@@ -40,7 +40,7 @@ public:
     // constructor
     Graph_t() {}
     // Graph_t(std::string samples_file, std::string connections_file);
-    void constructGraph(std::string samples_file, std::string connections_file);
+    void constructGraph(std::string samples_file, std::string connections_file, bool isLabeled);
     void specify_nodeStates(std::string samples_file);
     void specify_neighborCosts(std::string connections_file);
     void specify_neighborCostsAndLabels(std::string connections_file);

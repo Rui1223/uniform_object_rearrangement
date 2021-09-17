@@ -2,10 +2,10 @@
     <!-- launch specification file to get parameters for the task -->
     <include file="$(find uniform_object_rearrangement)/launch/task_specification.launch"></include>
 
-    <!-- run an example -->
-    <!-- arg (1)#object (2)instance_id (3)generate a new('g') or load an existing('l') instance (4)time_allowed -->
-    <node pkg="uniform_object_rearrangement" type="MonotoneTest.py" name="monotone_test" 
-        args="$(arg monotone_test)" output="screen" required="True" />
+    <!-- final experiments setting up -->
+    <!-- arg (1)#experiment per object (2)#instances needed per object -->
+    <node pkg="uniform_object_rearrangement" type="FinalExperiments.py" name="final_experiments"
+        args="$(arg final_experiments)" output="screen" required="True" />
 
     <node pkg="uniform_object_rearrangement" type="PybulletExecutionScene.py" name="pybullet_execution_scene"
 		    output="screen" required="True" />

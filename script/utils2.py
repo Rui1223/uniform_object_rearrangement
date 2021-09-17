@@ -25,6 +25,7 @@ from uniform_object_rearrangement.srv import ResetPlanningInstance, ResetPlannin
 from uniform_object_rearrangement.srv import ClearPlanningInstance, ClearPlanningInstanceRequest
 from uniform_object_rearrangement.srv import ClearExecutionInstance, ClearExecutionInstanceRequest
 from uniform_object_rearrangement.srv import ResetRoadmap, ResetRoadmapRequest
+from uniform_object_rearrangement.srv import ResetRobotHome, ResetRobotHomeRequest
 from uniform_object_rearrangement.srv import ExecuteTrajectory, ExecuteTrajectoryRequest
 from uniform_object_rearrangement.srv import AttachObject, AttachObjectRequest
 
@@ -118,12 +119,25 @@ def serviceCall_reset_roadmap(armType):
     rospy.wait_for_service("reset_roadmap")
     request = ResetRoadmapRequest()
     request.armType = armType
+
     try:
         resetRoadmap_proxy = rospy.ServiceProxy("reset_roadmap", ResetRoadmap)
         reset_roadmap_response = resetRoadmap_proxy(request)
         return reset_roadmap_response.success
     except rospy.ServiceException as e:
         print("reset_roadmap service call failed: %s" % e)
+
+def serviceCall_reset_robot_home(armType, isLabeledRoadmapUsed=True):
+    rospy.wait_for_service("reset_robot_home")
+    request = ResetRobotHomeRequest()
+    request.armType = armType
+    request.isLabeledRoadmapUsed = isLabeledRoadmapUsed
+    try:
+        resetRobotHome_proxy = rospy.ServiceProxy("reset_robot_home", ResetRobotHome)
+        reset_robot_home_response = resetRobotHome_proxy(request)
+        return reset_robot_home_response.success, reset_robot_home_response.resetHome_trajectory
+    except rospy.ServiceException as e:
+        print("reset_robot_home service call failed: %s" % e)
 
 def serviceCall_execute_trajectory(traj):
     '''call the ExecuteTrajectory service to execute the given trajectory
@@ -167,12 +181,13 @@ def serviceCall_attach_object(attach, object_idx, armType):
     except rospy.ServiceException as e:
         print(" attach_object service call failed: %s" % e)
 
-def executeWholePlan(whole_path):
+def executeWholePlan(whole_path, resetHome_trajectory=None):
     """ call the ExecuteTrajectory service to execute each trajectory in the path
         also tell the robot to attach or detach the object among the motions 
         inputs
         ======
             whole path (a list of ObjectRearrangementPath): a sequence of object paths
+            resetHome_trajectory (ArmTrajectory): the trajectory to set the robot home
         outputs
         =======
             execute_success (bool): indicate whether success or not
@@ -191,6 +206,9 @@ def executeWholePlan(whole_path):
             attach=False, object_idx=path.object_idx, armType=path.transit_trajectory.armType)
         ### finally execute the finish trajectory in the path
         execute_success = serviceCall_execute_trajectory(path.finish_trajectory)
+
+    if resetHome_trajectory != None:
+        execute_success = serviceCall_execute_trajectory(resetHome_trajectory)
 
     return execute_success
 
@@ -223,15 +241,17 @@ def saveInstance(cylinder_objects, instanceFolder):
             str(cylinder_object.curr_position.y) + " " + str(cylinder_object.curr_position.z) + "\n")
     f_instance.close()
 
-def saveWholePlan(object_paths, instanceFolder):
+def saveWholePlan(object_paths, instanceFolder, resetHome_trajectory=None):
     f_path = open(instanceFolder + "/path.obj", 'wb')
     pickle.dump(object_paths, f_path)
+    pickle.dump(resetHome_trajectory, f_path)
 
 def loadWholePlan(instanceFolder):
     '''load a plan from the specified folder'''
     f_path = open(instanceFolder + "/path.obj", 'rb')
     object_paths = pickle.load(f_path)
-    return object_paths
+    resetHome_trajectory = pickle.load(f_path)
+    return object_paths, resetHome_trajectory
 
 def saveSolution(all_methods_time, all_methods_success, all_method_nActions, instanceFolder):
     timeFile = instanceFolder + "/time.txt"
@@ -249,3 +269,10 @@ def saveSolution(all_methods_time, all_methods_success, all_method_nActions, ins
     for method_nActions in all_method_nActions:
         f_actions.write(str(method_nActions) + "\n")
     f_actions.close()
+
+def saveOrderingInfo(object_ordering, instanceFolder):
+    orderingFile = instanceFolder + "/ordering.txt"
+    f_ordering = open(orderingFile, "w")
+    for obj_idx in object_ordering:
+        f_ordering.write(str(obj_idx) + " ")
+    f_ordering.close()

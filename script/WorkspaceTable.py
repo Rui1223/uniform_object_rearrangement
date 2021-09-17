@@ -10,7 +10,7 @@ import math
 import numpy as np
 import time
 import IPython
-from random import uniform, random
+import random
 
 from CollisionChecker import CollisionChecker
 import utils
@@ -42,12 +42,16 @@ class WorkspaceTable(object):
         ### MINT, LAVENDER
         ### (21 colors up to 21 objects)
 
-        self.color_pools = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1],
-                        [0.96, 0.51, 0.19], [0.604, 0.388, 0.141], [0, 0, 0], [0.66, 0.66, 0.66],
-                        [0.259, 0.831, 0.957], [0.567, 0.118, 0.706], [0.749, 0.937, 0.271],
-                        [0.502, 0, 0], [0.502, 0.502, 0], [0.275, 0.6, 0.565], [0, 0, 0.459],
-                        [0.98, 0.745, 0.831], [1.0, 0.847, 0.694], [1.0, 0.98, 0.784],
-                        [0.667, 1.0, 0.765], [0.863, 0.745, 1.0]]
+        # self.color_pools = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1],
+        #                 [0.96, 0.51, 0.19], [0.604, 0.388, 0.141], [0, 0, 0], [0.66, 0.66, 0.66],
+        #                 [0.259, 0.831, 0.957], [0.567, 0.118, 0.706], [0.749, 0.937, 0.271],
+        #                 [0.502, 0, 0], [0.502, 0.502, 0], [0.275, 0.6, 0.565], [0, 0, 0.459],
+        #                 [0.98, 0.745, 0.831], [1.0, 0.847, 0.694], [1.0, 0.98, 0.784],
+        #                 [0.667, 1.0, 0.765], [0.863, 0.745, 1.0]]
+
+        self.color_pools = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1], [0.96, 0.51, 0.19], 
+                            [1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1], [0.96, 0.51, 0.19],
+                            [1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0], [1, 0, 1], [0.96, 0.51, 0.19]]
 
     def createRobotStandingBase(self, robotBasePosition, standingBase_dim, isPhysicsTurnOn):
         ################ create the known geometries - standingBase  ####################
@@ -198,9 +202,9 @@ class WorkspaceTable(object):
                 print("generate the {}th object".format(obj_i))
                 timeout -= 1
                 start_pos = [
-                    round(uniform(self.constrained_area_x_limit[0] + self.cylinder_radius, \
+                    round(random.uniform(self.constrained_area_x_limit[0] + self.cylinder_radius, \
                             self.constrained_area_x_limit[1] - self.side_clearance_x - self.cylinder_radius), 3),
-                    round(uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
+                    round(random.uniform(self.constrained_area_y_limit[0] + self.side_clearance_y + self.cylinder_radius, \
                             self.constrained_area_y_limit[1] - self.side_clearance_y - self.cylinder_radius), 3),
                     round(self.tablePosition[2] + self.table_dim[2] / 2 + self.cylinder_height / 2, 3)
                 ]
@@ -513,6 +517,88 @@ class WorkspaceTable(object):
         ### (1) deletes all object meshes in the workspace
         for obj_idx, object_info in self.object_geometries.items():
             p.removeBody(object_info.geo)
+
+    def set_scene_for_objects(self, arrangement):
+        ### put the object at the position specified by the arrangement
+        for obj_idx in range(len(arrangement)):
+            position_idx = arrangement[obj_idx]
+            if position_idx >= self.num_candidates:
+                ### put the object back to its initial position
+                p.resetBasePositionAndOrientation(self.object_geometries[obj_idx].geo, 
+                    self.object_initial_infos[obj_idx].pos, [0, 0, 0, 1.0], physicsClientId=self.server)
+                self.object_geometries[obj_idx].setCurrPosition(position_idx, 
+                    self.object_initial_infos[obj_idx].collision_position_idx, self.object_initial_infos[obj_idx].pos)
+            else:
+                ### put the object back to a candidate position
+                p.resetBasePositionAndOrientation(self.object_geometries[obj_idx].geo, 
+                    self.candidate_geometries[position_idx].pos, [0, 0, 0, 1.0], physicsClientId=self.server)
+                self.object_geometries[obj_idx].setCurrPosition(position_idx, position_idx, self.candidate_geometries[position_idx].pos)
+        # print("=================================")
+        # for obj_idx, obj_info in self.object_geometries.items():
+        #     print(obj_idx)
+        #     print(obj_info.curr_pos)
+        #     print(obj_info.curr_position_idx)
+        #     print(obj_info.collision_position_idx)
+        #     print("\n")
+
+    def selectNoCollisionBuffer(self, object_idx, target_position_idx):
+        ### this function selects a buffer to put a specified object without collision
+        max_trials = 3
+        current_trials = 1
+        buffer_select_success = False
+        other_object_curr_geometries =[obj_info.geo for obj_info in self.object_geometries.values() if obj_info.object_index != object_idx]
+        while (current_trials <= max_trials) and (buffer_select_success == False):
+            buffer_idx = random.choice(range(self.num_candidates))
+            while buffer_idx == self.object_geometries[object_idx].curr_position_idx or buffer_idx == target_position_idx:
+                ### the buffer is selected as the chosen object's current position or its target position
+                buffer_idx = random.choice(range(self.num_candidates))
+            ### now make sure the selected buffer has safe distance with other existing objects
+            isCollision = self.collisionAgent.collisionCheck_instance_cylinder_objects(
+                self.candidate_geometries[buffer_idx].geo, other_object_curr_geometries, self.cylinder_radius)
+            if not isCollision:
+                buffer_select_success = True
+                break
+            else:
+                current_trials += 1
+        ### reach here either success or not
+        return buffer_select_success, buffer_idx
+
+    def getObjectConstraintRanking(self, objects_to_move, final_arrangement):
+        ### this functions ranks the objects in the objects_to_move
+        ### giving the reasoning about the their constraints
+        ### i.e., how constraining and constrained they are
+        object_constraints_degrees = {}
+        for obj_idx in objects_to_move:
+            ### (0) constraining (inner degree) (1) constrained (outer degree)
+            object_constraints_degrees[obj_idx] = [0, 0]
+        ### Now check the constraint for the current geometry of the object
+        for obj_idx in objects_to_move:
+            geo = self.object_geometries[obj_idx].geo
+            other_object_geometries = {}
+            for other_obj_idx in objects_to_move:
+                if other_obj_idx == obj_idx: continue
+                other_object_geometries[other_obj_idx] = self.candidate_geometries[final_arrangement[other_obj_idx]].geo
+                # other_object_geometries[other_obj_idx] = self.candidate_geometries[self.object_geometries[other_obj_idx].goal_position_idx].geo
+            object_goals_to_collide = self.collisionAgent.collisionCheck_objectAndObjects(geo, other_object_geometries)
+            for object_to_collide in object_goals_to_collide:
+                ### constraint: object_to_collide --> obj_idx
+                object_constraints_degrees[obj_idx][0] += 1
+                object_constraints_degrees[object_to_collide][1] += 1
+
+        object_degrees = {}
+        for obj_idx, degrees in object_constraints_degrees.items():
+            object_degrees[obj_idx] = degrees[0] + degrees[1]
+
+        object_ranking = sorted(object_degrees, key=lambda k : object_degrees[k], reverse=True)
+        return object_ranking
+        
+
+        
+
+
+
+
+
 
 
 ### general class of object in the workspace

@@ -81,6 +81,9 @@ add_service_files(
   ResetPlanningInstance.srv
   ResetRoadmap.srv
   ResetRobotCurrConfig.srv
+  ResetRobotHome.srv
+  SelectObjectAndBuffer.srv
+  SetSceneBasedOnArrangement.srv
   UpdateCertainObjectPose.srv
   UpdateManipulationStatus.srv
 )

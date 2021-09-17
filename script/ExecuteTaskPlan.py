@@ -43,9 +43,9 @@ def main(args):
     initialize_instance_success = utils2.serviceCall_generateInstanceCylinder(
             task_plan_executor.num_objects, task_plan_executor.instance_id, False)
     if initialize_instance_success:
-        object_paths = utils2.loadWholePlan(task_plan_executor.instanceFolder)
+        object_paths, resetHome_trajectory = utils2.loadWholePlan(task_plan_executor.instanceFolder)
         input("press enter to see the execution of the task plan")
-        utils2.executeWholePlan(object_paths)
+        utils2.executeWholePlan(object_paths, resetHome_trajectory)
         print("finish the execution!")
 
     while not rospy.is_shutdown():
