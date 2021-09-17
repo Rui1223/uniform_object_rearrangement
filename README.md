@@ -38,7 +38,7 @@ In summary, if you run <br/>
 `roslaunch uniform_object_rearrangement run_example.launch run_example:="6 1 l 180 CIRS"` <br/>
 you are loading an existing example in the instance folder named "examples/6/1" (1st instance in the 6-object scenario) and use CIRS as the method to solve it given a limitation of 180 seconds.
 
-if you run
+if you run <br/>
 `roslaunch uniform_object_rearrangement run_example.launch run_example:="8 3 g 180 CIRS"` <br/>
 you are generating a new example as the 3rd instance in the 8-object scenario and use CIRS as the method to solve it given a limitation of 180 seconds.
 
