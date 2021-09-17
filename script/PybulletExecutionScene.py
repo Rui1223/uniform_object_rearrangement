@@ -8,8 +8,8 @@ import time
 import sys
 import os
 import numpy as np
-from cv_bridge import CvBridge, CvBridgeError
-import cv2
+# from cv_bridge import CvBridge, CvBridgeError
+# import cv2
 
 from MotomanRobot import MotomanRobot
 from WorkspaceTable import WorkspaceTable
@@ -286,7 +286,7 @@ def main(args):
     pybullet_execution_scene = PybulletExecutionScene(args)
     pybullet_execution_scene.rosInit()
     rate = rospy.Rate(10) ### 10hz
-    bridge = CvBridge()
+    # bridge = CvBridge()
 
     count = 0
 
