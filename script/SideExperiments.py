@@ -16,8 +16,8 @@ from UnidirDFSDPPlanner import UnidirDFSDPPlanner
 from UnidirCIRSPlanner import UnidirCIRSPlanner
 
 ############################### description ###########################################
-### This class defines a SideExperiments class which
-### conducts large-scale experiments with different methods
+### This class defines a SideExperimenter class which
+### conducts large-scale experiments with different methods (labeled vs. unlabeled)
 ### with the number of experiments specified for each case (#objects)
 ### It
 ### (1) asks the execution scene to generate an instance
@@ -52,21 +52,21 @@ class SideExperimenter(object):
         ### initialize obj-level statistics variable
         self.CIRS_time_obj = []
         self.CIRS_nonlabeled_time_obj = []
-        self.DFS_DP_labeled_time_obj = []
-        self.DFS_DP_nonlabeled_time_obj = []
-        self.mRS_labeled_time_obj = []
+        self.DFSDP_time_obj = []
+        self.DFSDP_nonlabeled_time_obj = []
+        self.mRS_time_obj = []
         self.mRS_nonlabeled_time_obj = []
         self.CIRS_success_obj = []
         self.CIRS_nonlabeled_success_obj = []
-        self.DFS_DP_labeled_success_obj = []
-        self.DFS_DP_nonlabeled_success_obj = []
-        self.mRS_labeled_success_obj = []
+        self.DFSDP_success_obj = []
+        self.DFSDP_nonlabeled_success_obj = []
+        self.mRS_success_obj = []
         self.mRS_nonlabeled_success_obj = []
         self.CIRS_nActions_obj = []
         self.CIRS_nonlabeled_nActions_obj = []
-        self.DFS_DP_labeled_nActions_obj = []
-        self.DFS_DP_nonlabeled_nActions_obj = []
-        self.mRS_labeled_nActions_obj = []
+        self.DFSDP_nActions_obj = []
+        self.DFSDP_nonlabeled_nActions_obj = []
+        self.mRS_nActions_obj = []
         self.mRS_nonlabeled_nActions_obj = []
 
     def saveAverageSolutionPerNumObject(self):
@@ -82,21 +82,21 @@ class SideExperimenter(object):
         else:
             average_cirs_nonlabeled_time_obj = 10000
         all_methods_average_time_obj.append(average_cirs_nonlabeled_time_obj)
-        if len(self.DFS_DP_labeled_time_obj) != 0:
-            average_DFS_DP_labeled_time_obj = sum(self.DFS_DP_labeled_time_obj) / len(self.DFS_DP_labeled_time_obj)
+        if len(self.DFSDP_time_obj) != 0:
+            average_DFSDP_time_obj = sum(self.DFSDP_time_obj) / len(self.DFSDP_time_obj)
         else:
-            average_DFS_DP_labeled_time_obj = 10000
-        all_methods_average_time_obj.append(average_DFS_DP_labeled_time_obj)
-        if len(self.DFS_DP_nonlabeled_time_obj) != 0:
-            average_DFS_DP_nonlabeled_time_obj = sum(self.DFS_DP_nonlabeled_time_obj) / len(self.DFS_DP_nonlabeled_time_obj)
+            average_DFSDP_time_obj = 10000
+        all_methods_average_time_obj.append(average_DFSDP_time_obj)
+        if len(self.DFSDP_nonlabeled_time_obj) != 0:
+            average_DFSDP_nonlabeled_time_obj = sum(self.DFSDP_nonlabeled_time_obj) / len(self.DFSDP_nonlabeled_time_obj)
         else:
-            average_DFS_DP_nonlabeled_time_obj = 10000
-        all_methods_average_time_obj.append(average_DFS_DP_nonlabeled_time_obj)
-        if len(self.mRS_labeled_time_obj) != 0:
-            average_mRS_labeled_time_obj = sum(self.mRS_labeled_time_obj) / len(self.mRS_labeled_time_obj)
+            average_DFSDP_nonlabeled_time_obj = 10000
+        all_methods_average_time_obj.append(average_DFSDP_nonlabeled_time_obj)
+        if len(self.mRS_time_obj) != 0:
+            average_mRS_time_obj = sum(self.mRS_time_obj) / len(self.mRS_time_obj)
         else:
-            average_mRS_labeled_time_obj = 10000
-        all_methods_average_time_obj.append(average_mRS_labeled_time_obj)
+            average_mRS_time_obj = 10000
+        all_methods_average_time_obj.append(average_mRS_time_obj)
         if len(self.mRS_nonlabeled_time_obj) != 0:
             average_mRS_nonlabeled_time_obj = sum(self.mRS_nonlabeled_time_obj) / len(self.mRS_nonlabeled_time_obj)
         else:
@@ -114,21 +114,21 @@ class SideExperimenter(object):
         else:
             average_cirs_nonlabeled_success_obj = 0.0
         all_methods_average_success_obj.append(average_cirs_nonlabeled_success_obj)
-        if len(self.DFS_DP_labeled_success_obj) != 0:
-            average_DFS_DP_labeled_success_obj = sum(self.DFS_DP_labeled_success_obj) / len(self.DFS_DP_labeled_success_obj)
+        if len(self.DFSDP_success_obj) != 0:
+            average_DFSDP_success_obj = sum(self.DFSDP_success_obj) / len(self.DFSDP_success_obj)
         else:
-            average_DFS_DP_labeled_success_obj = 0.0
-        all_methods_average_success_obj.append(average_DFS_DP_labeled_success_obj)
-        if len(self.DFS_DP_nonlabeled_success_obj) != 0:
-            average_DFS_DP_nonlabeled_success_obj = sum(self.DFS_DP_nonlabeled_success_obj) / len(self.DFS_DP_nonlabeled_success_obj)
+            average_DFSDP_success_obj = 0.0
+        all_methods_average_success_obj.append(average_DFSDP_success_obj)
+        if len(self.DFSDP_nonlabeled_success_obj) != 0:
+            average_DFSDP_nonlabeled_success_obj = sum(self.DFSDP_nonlabeled_success_obj) / len(self.DFSDP_nonlabeled_success_obj)
         else:
-            average_DFS_DP_nonlabeled_success_obj = 0.0
-        all_methods_average_success_obj.append(average_DFS_DP_nonlabeled_success_obj)
-        if len(self.mRS_labeled_success_obj) != 0:
-            average_mRS_labeled_success_obj = sum(self.mRS_labeled_success_obj) / len(self.mRS_labeled_success_obj)
+            average_DFSDP_nonlabeled_success_obj = 0.0
+        all_methods_average_success_obj.append(average_DFSDP_nonlabeled_success_obj)
+        if len(self.mRS_success_obj) != 0:
+            average_mRS_success_obj = sum(self.mRS_success_obj) / len(self.mRS_success_obj)
         else:
-            average_mRS_labeled_success_obj = 0.0
-        all_methods_average_success_obj.append(average_mRS_labeled_success_obj)
+            average_mRS_success_obj = 0.0
+        all_methods_average_success_obj.append(average_mRS_success_obj)
         if len(self.mRS_nonlabeled_success_obj) != 0:
             average_mRS_nonlabeled_success_obj = sum(self.mRS_nonlabeled_success_obj) / len(self.mRS_nonlabeled_success_obj)
         else:
@@ -146,21 +146,21 @@ class SideExperimenter(object):
         else:
             average_cirs_nonlabeled_nActions_obj = 0.0
         all_methods_average_nActions_obj.append(average_cirs_nonlabeled_nActions_obj)
-        if len(self.DFS_DP_labeled_nActions_obj) != 0:
-            average_DFS_DP_labeled_nActions_obj = sum(self.DFS_DP_labeled_nActions_obj) / len(self.DFS_DP_labeled_nActions_obj)
+        if len(self.DFSDP_nActions_obj) != 0:
+            average_DFSDP_nActions_obj = sum(self.DFSDP_nActions_obj) / len(self.DFSDP_nActions_obj)
         else:
-            average_DFS_DP_labeled_nActions_obj = 0.0
-        all_methods_average_nActions_obj.append(average_DFS_DP_labeled_nActions_obj)
-        if len(self.DFS_DP_nonlabeled_nActions_obj) != 0:
-            average_DFS_DP_nonlabeled_nActions_obj = sum(self.DFS_DP_nonlabeled_nActions_obj) / len(self.DFS_DP_nonlabeled_nActions_obj)
+            average_DFSDP_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_DFSDP_nActions_obj)
+        if len(self.DFSDP_nonlabeled_nActions_obj) != 0:
+            average_DFSDP_nonlabeled_nActions_obj = sum(self.DFSDP_nonlabeled_nActions_obj) / len(self.DFSDP_nonlabeled_nActions_obj)
         else:
-            average_DFS_DP_nonlabeled_nActions_obj = 0.0
-        all_methods_average_nActions_obj.append(average_DFS_DP_nonlabeled_nActions_obj)
-        if len(self.mRS_labeled_nActions_obj) != 0:
-            average_mRS_labeled_nActions_obj = sum(self.mRS_labeled_nActions_obj) / len(self.mRS_labeled_nActions_obj)
+            average_DFSDP_nonlabeled_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_DFSDP_nonlabeled_nActions_obj)
+        if len(self.mRS_nActions_obj) != 0:
+            average_mRS_nActions_obj = sum(self.mRS_nActions_obj) / len(self.mRS_nActions_obj)
         else:
-            average_mRS_labeled_nActions_obj = 0.0
-        all_methods_average_nActions_obj.append(average_mRS_labeled_nActions_obj)
+            average_mRS_nActions_obj = 0.0
+        all_methods_average_nActions_obj.append(average_mRS_nActions_obj)
         if len(self.mRS_nonlabeled_nActions_obj) != 0:
             average_mRS_nonlabeled_nActions_obj = sum(self.mRS_nonlabeled_nActions_obj) / len(self.mRS_nonlabeled_nActions_obj)
         else:
@@ -241,7 +241,7 @@ def main(args):
             #####################################################################
 
             ###### try other methods now ######
-            ### (i-ii) CIRS_nonlabeled
+            ### (ii) CIRS_nonlabeled
             start_time = time.time()
             unidir_cirs_planner = UnidirCIRSPlanner(
                 initial_arrangement, final_arrangement, side_experimenter.time_allowed,
@@ -263,71 +263,71 @@ def main(args):
             reset_instance_success = utils2.resetInstance("Right_torso")
             #####################################################################
 
-            ### (ii) DFS_DP_labeled
+            ### (iii) DFSDP
             start_time = time.time()
             unidir_dfsdp_planner = UnidirDFSDPPlanner(
                 initial_arrangement, final_arrangement, side_experimenter.time_allowed)
-            DFS_DP_labeled_planning_time = time.time() - start_time
-            DFS_DP_labeled_isSolved = unidir_dfsdp_planner.isSolved
-            DFS_DP_labeled_nActions = unidir_dfsdp_planner.best_solution_cost
-            side_experimenter.DFS_DP_labeled_time_obj.append(DFS_DP_labeled_planning_time)
-            side_experimenter.DFS_DP_labeled_success_obj.append(float(DFS_DP_labeled_isSolved))
-            if DFS_DP_labeled_nActions != np.inf:
-                side_experimenter.DFS_DP_labeled_nActions_obj.append(DFS_DP_labeled_nActions)
+            DFSDP_planning_time = time.time() - start_time
+            DFSDP_isSolved = unidir_dfsdp_planner.isSolved
+            DFSDP_nActions = unidir_dfsdp_planner.best_solution_cost
+            side_experimenter.DFSDP_time_obj.append(DFSDP_planning_time)
+            side_experimenter.DFSDP_success_obj.append(float(DFSDP_isSolved))
+            if DFSDP_nActions != np.inf:
+                side_experimenter.DFSDP_nActions_obj.append(DFSDP_nActions)
             else:
-                DFS_DP_labeled_nActions = 5000
-            all_methods_time_instance.append(DFS_DP_labeled_planning_time)
-            all_methods_success_instance.append(float(DFS_DP_labeled_isSolved))
-            all_methods_nActions_instance.append(DFS_DP_labeled_nActions)
+                DFSDP_nActions = 5000
+            all_methods_time_instance.append(DFSDP_planning_time)
+            all_methods_success_instance.append(float(DFSDP_isSolved))
+            all_methods_nActions_instance.append(DFSDP_nActions)
 
             #####################################################################
             reset_instance_success = utils2.resetInstance("Right_torso")
             #####################################################################
 
-            ### (iii) DFS_DP_nonlabeled
+            ### (iv) DFSDP_nonlabeled
             start_time = time.time()
             unidir_dfsdp_planner = UnidirDFSDPPlanner(
                 initial_arrangement, final_arrangement, side_experimenter.time_allowed,
                 isLabeledRoadmapUsed=False)
-            DFS_DP_nonlabeled_planning_time = time.time() - start_time
-            DFS_DP_nonlabeled_isSolved = unidir_dfsdp_planner.isSolved
-            DFS_DP_nonlabeled_nActions = unidir_dfsdp_planner.best_solution_cost
-            side_experimenter.DFS_DP_nonlabeled_time_obj.append(DFS_DP_nonlabeled_planning_time)
-            side_experimenter.DFS_DP_nonlabeled_success_obj.append(float(DFS_DP_nonlabeled_isSolved))
-            if DFS_DP_nonlabeled_nActions != np.inf:
-                side_experimenter.DFS_DP_nonlabeled_nActions_obj.append(DFS_DP_nonlabeled_nActions)
+            DFSDP_nonlabeled_planning_time = time.time() - start_time
+            DFSDP_nonlabeled_isSolved = unidir_dfsdp_planner.isSolved
+            DFSDP_nonlabeled_nActions = unidir_dfsdp_planner.best_solution_cost
+            side_experimenter.DFSDP_nonlabeled_time_obj.append(DFSDP_nonlabeled_planning_time)
+            side_experimenter.DFSDP_nonlabeled_success_obj.append(float(DFSDP_nonlabeled_isSolved))
+            if DFSDP_nonlabeled_nActions != np.inf:
+                side_experimenter.DFSDP_nonlabeled_nActions_obj.append(DFSDP_nonlabeled_nActions)
             else:
-                DFS_DP_nonlabeled_nActions = 5000
-            all_methods_time_instance.append(DFS_DP_nonlabeled_planning_time)
-            all_methods_success_instance.append(float(DFS_DP_nonlabeled_isSolved))
-            all_methods_nActions_instance.append(DFS_DP_nonlabeled_nActions)
+                DFSDP_nonlabeled_nActions = 5000
+            all_methods_time_instance.append(DFSDP_nonlabeled_planning_time)
+            all_methods_success_instance.append(float(DFSDP_nonlabeled_isSolved))
+            all_methods_nActions_instance.append(DFSDP_nonlabeled_nActions)
 
             #####################################################################
             reset_instance_success = utils2.resetInstance("Right_torso")
             #####################################################################
 
-            ### (iv) mRS_labeled
+            ### (v) mRS
             start_time = time.time()
             unidir_mrs_planner = UnidirMRSPlanner(
                 initial_arrangement, final_arrangement, side_experimenter.time_allowed)
-            mRS_labeled_planning_time = time.time() - start_time
-            mRS_labeled_isSolved = unidir_mrs_planner.isSolved
-            mRS_labeled_nActions = unidir_mrs_planner.best_solution_cost
-            side_experimenter.mRS_labeled_time_obj.append(mRS_labeled_planning_time)
-            side_experimenter.mRS_labeled_success_obj.append(float(mRS_labeled_isSolved))
-            if mRS_labeled_nActions != np.inf:
-                side_experimenter.mRS_labeled_nActions_obj.append(mRS_labeled_nActions)  
+            mRS_planning_time = time.time() - start_time
+            mRS_isSolved = unidir_mrs_planner.isSolved
+            mRS_nActions = unidir_mrs_planner.best_solution_cost
+            side_experimenter.mRS_time_obj.append(mRS_planning_time)
+            side_experimenter.mRS_success_obj.append(float(mRS_isSolved))
+            if mRS_nActions != np.inf:
+                side_experimenter.mRS_nActions_obj.append(mRS_nActions)  
             else:
-                mRS_labeled_nActions = 5000
-            all_methods_time_instance.append(mRS_labeled_planning_time)
-            all_methods_success_instance.append(float(mRS_labeled_isSolved))
-            all_methods_nActions_instance.append(mRS_labeled_nActions)
+                mRS_nActions = 5000
+            all_methods_time_instance.append(mRS_planning_time)
+            all_methods_success_instance.append(float(mRS_isSolved))
+            all_methods_nActions_instance.append(mRS_nActions)
             
             #####################################################################
             reset_instance_success = utils2.resetInstance("Right_torso")
             #####################################################################
 
-            ### (v) mRS_nonlabeled
+            ### (vi) mRS_nonlabeled
             start_time = time.time()
             unidir_mrs_planner = UnidirMRSPlanner(
                 initial_arrangement, final_arrangement, side_experimenter.time_allowed, 

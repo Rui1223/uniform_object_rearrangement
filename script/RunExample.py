@@ -70,25 +70,25 @@ def main(args):
             start_time = time.time()
             the_chosen_planner = UnidirCIRSPlanner(
                 initial_arrangement, final_arrangement, example_runner.time_allowed)
-        ### (i-ii) CIRS_nonlabeled
+        ### (ii) CIRS_nonlabeled
         if example_runner.method_name == "CIRS_nonlabeled":
             start_time = time.time()
             the_chosen_planner = UnidirCIRSPlanner(
                 initial_arrangement, final_arrangement, example_runner.time_allowed, \
                 isLabeledRoadmapUsed=False)
-        ### (ii) DFS_DP_labeled
-        if example_runner.method_name == "DFS_DP_labeled":
+        ### (iii) DFS_DP
+        if example_runner.method_name == "DFSDP":
             start_time = time.time()
             the_chosen_planner = UnidirDFSDPPlanner(
                 initial_arrangement, final_arrangement, example_runner.time_allowed)
-        ### (iii) DFS_DP_nonlabeled
-        if example_runner.method_name == "DFS_DP_nonlabeled":
+        ### (iv) DFS_DP_nonlabeled
+        if example_runner.method_name == "DFSDP_nonlabeled":
             start_time = time.time()
             the_chosen_planner = UnidirDFSDPPlanner(
                 initial_arrangement, final_arrangement, example_runner.time_allowed, \
                 isLabeledRoadmapUsed=False)
-        ### (iv) mRS_labeled
-        if example_runner.method_name == "mRS_labeled":
+        ### (iv) mRS
+        if example_runner.method_name == "mRS":
             start_time = time.time()
             the_chosen_planner = UnidirMRSPlanner(
                 initial_arrangement, final_arrangement, example_runner.time_allowed)

@@ -35,7 +35,7 @@ class FinalExperimenter(object):
         self.ExperimentsFolder = os.path.join(self.rosPackagePath, "final_experiments")
         if not os.path.exists(self.ExperimentsFolder):
             os.makedirs(self.ExperimentsFolder)
-        self.numObjects_options = [11,12,13,14]
+        self.numObjects_options = [6,7,8,9,10,11,12]
         self.numExperiments_perObject = int(args[1])
         self.maxInstancesNeed_perObject = int(args[2])
         self.time_allowed_monotone = 180
