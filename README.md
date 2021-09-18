@@ -18,7 +18,7 @@ numpy>=1.11.0 <br/>
 OpenCV 4.2.0 <br/>
 scipy <br/>
 IPython <br/>
-pickle <br/>
+Pickle <br/>
 It could be difficult to exhaustively list all potential dependencies. Should you have any difficulties trying the software, do not hesitate to contact wrui1223@gmail.com for further help.
 
 ### Instruction
