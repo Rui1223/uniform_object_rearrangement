@@ -9,11 +9,11 @@ import sys
 import os
 import numpy as np
 # from cv_bridge import CvBridge, CvBridgeError
-# import cv2
+import cv2
 
 from MotomanRobot import MotomanRobot
 from WorkspaceTable import WorkspaceTable
-# from SimulatedCamera import SimulatedCamera
+from SimulatedCamera import SimulatedCamera
 from Executor import Executor
 
 import rospy
@@ -77,7 +77,7 @@ class PybulletExecutionScene(object):
         self.workspace_e.addConstrainedArea(ceiling_height, thickness_flank)
         self.workspace_e.setDeploymentParam(
                 cylinder_radius, cylinder_height, side_clearance_x, side_clearance_y)
-        # self.setupCamera(camera_extrinsic, camera_intrinsic)
+        self.setupCamera(camera_extrinsic, camera_intrinsic)
 
         ### create an executor assistant
         self.executor_e = Executor(self.executingClientID,
@@ -104,20 +104,20 @@ class PybulletExecutionScene(object):
             os.path.join(self.rosPackagePath, object_mesh_path),
             isPhysicsTurnOn, self.executingClientID)
 
-    # def setupCamera(self, camera_extrinsic, camera_intrinsic):
-    #     ### This function sets up the camera
-    #     ### indicate which scene you are working on and whether you want to save images
+    def setupCamera(self, camera_extrinsic, camera_intrinsic):
+        ### This function sets up the camera
+        ### indicate which scene you are working on and whether you want to save images
 
-    #     self.scene_index = "1"
-    #     self.saveImages = False ### decide whether to save images or not
-    #     # self.scene_index = args[1]
-    #     # self.saveImages = (args[2] in ('y', 'Y')) ### decide whether to save images or not
-    #     self.camera_e = SimulatedCamera(
-    #         self.workspace_e.tablePosition, self.workspace_e.table_dim,
-    #         camera_extrinsic, camera_intrinsic,
-    #         self.scene_index, self.saveImages,
-    #         self.executingClientID
-    #     )
+        self.scene_index = "1"
+        self.saveImages = False ### decide whether to save images or not
+        # self.scene_index = args[1]
+        # self.saveImages = (args[2] in ('y', 'Y')) ### decide whether to save images or not
+        self.camera_e = SimulatedCamera(
+            self.workspace_e.tablePosition, self.workspace_e.table_dim,
+            camera_extrinsic, camera_intrinsic,
+            self.scene_index, self.saveImages,
+            self.executingClientID
+        )
 
 
     def rosInit(self):
