@@ -15,6 +15,7 @@ The robot physics simulator is Pybullet 3.1.3. Pybullet can be downloaded [here]
 Below are the addtional dependencies you need to install so as to run the code smoothly.
 matplotlib <br/>
 numpy>=1.11.0 <br/>
+openCV 4.2.0 <br/>
 scipy <br/>
 IPython <br/>
 pickle <br/>
