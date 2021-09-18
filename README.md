@@ -14,9 +14,9 @@ The software infrastructure is developed in Ubuntu 20.04 with ROS Noetic and Pyt
 The robot physics simulator is Pybullet 3.1.3. Pybullet can be downloaded [here](https://pypi.org/project/pybullet/).
 Below are the addtional dependencies you need to install so as to run the code smoothly.
 matplotlib <br/>
-numpy>=1.11.0 <br/>
+Numpy>=1.11.0 <br/>
 OpenCV 4.2.0 <br/>
-scipy <br/>
+Scipy <br/>
 IPython <br/>
 Pickle <br/>
 It could be difficult to exhaustively list all potential dependencies. Should you have any difficulties trying the software, do not hesitate to contact wrui1223@gmail.com for further help.
