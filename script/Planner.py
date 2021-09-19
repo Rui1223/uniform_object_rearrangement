@@ -1535,10 +1535,10 @@ class Planner(object):
         
         ################ then check potential collision with objects not in hand ####################
         ### first get all the objects which are not in hand (here objects are really candidates)
-        static_object_geometries = { obj_info.object_index : obj_info.geo \
+        static_object_geometries = { obj_info.position_idx : obj_info.geo \
             for obj_info in workspace.candidate_geometries.values() \
-            if (obj_info.object_index != self.objectInLeftHand_idx) and \
-                (obj_info.object_index != self.objectInRightHand_idx) }
+            if (obj_info.position_idx != self.objectInLeftHand_idx) and \
+                (obj_info.position_idx != self.objectInRightHand_idx) }
         ### FLAG: 4
         isConfigValid, FLAG, objectCollided = \
             self.checkConfig_CollisionBetweenRobotAndStaticObjects_labeled(robot, static_object_geometries)
