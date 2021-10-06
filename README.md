@@ -10,7 +10,9 @@ Below is a simulated example of a Motoman SDA10F robot rearranging cylindrical o
 <img src="image_materials/rearrangement_example.gif" />
 
 **Real robot demo videos:**
+
 [![IMAGE ALT TEXT](http://img.youtube.com/vi/iBIkDog2caU/0.jpg)](https://www.youtube.com/watch?v=iBIkDog2caU&ab_channel=PRACSYS)
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/EUeo8PUi3HQ/0.jpg)](https://www.youtube.com/watch?v=EUeo8PUi3HQ&ab_channel=PRACSYS)
 
 
 ### Getting Started
