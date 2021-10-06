@@ -9,6 +9,10 @@ Below is a simulated example of a Motoman SDA10F robot rearranging cylindrical o
 
 <img src="image_materials/rearrangement_example.gif" />
 
+**Real robot demo videos:**
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/iBIkDog2caU/0.jpg)](https://www.youtube.com/watch?v=iBIkDog2caU&ab_channel=PRACSYS)
+
+
 ### Getting Started
 The software infrastructure is developed in Ubuntu 20.04 with ROS Noetic and Python 3.8.10.
 The robot physics simulator is Pybullet 3.1.3. Pybullet can be downloaded [here](https://pypi.org/project/pybullet/).
