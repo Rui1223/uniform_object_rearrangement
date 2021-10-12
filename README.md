@@ -15,6 +15,19 @@ Below is a simulated example of a Motoman SDA10F robot rearranging cylindrical o
 [![IMAGE ALT TEXT](http://img.youtube.com/vi/EUeo8PUi3HQ/0.jpg)](https://www.youtube.com/watch?v=EUeo8PUi3HQ&ab_channel=PRACSYS)
 [![IMAGE ALT TEXT](http://img.youtube.com/vi/pYr6LGAE5mY/0.jpg)](https://www.youtube.com/watch?v=pYr6LGAE5mY&ab_channel=PRACSYS)
 
+**Paper:** https://arxiv.org/abs/2110.02814
+
+**Citation:**
+If you find this repository helpful to your research, I will be very happy and I gently request you to cite the paper:
+
+```
+@article{wang2021efficient,
+  title={Efficient and High-quality Prehensile Rearrangement in Cluttered and Confined Spaces},
+  author={Wang, Rui and Miao, Yinglong and Bekris, Kostas E},
+  journal={arXiv preprint arXiv:2110.02814},
+  year={2021}
+}
+```
 
 ### Getting Started
 The software infrastructure is developed in Ubuntu 20.04 with ROS Noetic and Python 3.8.10.
