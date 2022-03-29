@@ -21,11 +21,12 @@ Below is a simulated example of a Motoman SDA10F robot rearranging cylindrical o
 If you find this repository helpful to your research, I will be very happy and I gently request you to cite the paper:
 
 ```
-@article{wang2021efficient,
+@inproceedings{wang2021efficient,
   title={Efficient and High-quality Prehensile Rearrangement in Cluttered and Confined Spaces},
-  author={Wang, Rui and Miao, Yinglong and Bekris, Kostas E},
-  journal={arXiv preprint arXiv:2110.02814},
-  year={2021}
+  author={Rui Wang and Yinglong Miao and Kostas E. Bekris},
+  booktitle={IEEE International Conference on Robotics and Automation (ICRA)},
+  year={2022},
+  organization={IEEE}
 }
 ```
 
