@@ -23,7 +23,7 @@ If you find this repository helpful to your research, I will be very happy and I
 ```
 @inproceedings{wang2021efficient,
   title={Efficient and High-quality Prehensile Rearrangement in Cluttered and Confined Spaces},
-  author={Rui Wang and Yinglong Miao and Kostas E. Bekris},
+  author={Rui Wang, Yinglong Miao and Kostas E. Bekris},
   booktitle={IEEE International Conference on Robotics and Automation (ICRA)},
   year={2022},
   organization={IEEE}
